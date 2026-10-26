@@ -6,7 +6,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"kanbantui/internal/db"
+	"github.com/ReptilianBrain/kanban-tui/internal/db"
 )
 
 const notesPlaceholderAdd = "Type a note, Enter to add…"

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"kanbantui/internal/db"
+	"github.com/ReptilianBrain/kanban-tui/internal/db"
 )
 
 // priorityBadge is a styled plain-word badge with a trailing space baked in,

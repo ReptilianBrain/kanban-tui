@@ -3,7 +3,7 @@ package tui
 import (
 	tea "github.com/charmbracelet/bubbletea"
 
-	"kanbantui/internal/config"
+	"github.com/ReptilianBrain/kanban-tui/internal/config"
 )
 
 // herdrRepoModal is a left/right cycler over the known repo paths in

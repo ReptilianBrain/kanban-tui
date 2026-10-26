@@ -3,7 +3,7 @@ package tui
 import (
 	tea "github.com/charmbracelet/bubbletea"
 
-	"kanbantui/internal/db"
+	"github.com/ReptilianBrain/kanban-tui/internal/db"
 )
 
 // filterModal picks a label to filter the board by, as a left/right cycler

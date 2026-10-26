@@ -8,7 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"kanbantui/internal/db"
+	"github.com/ReptilianBrain/kanban-tui/internal/db"
 )
 
 // seedCard is one card of the synthetic test board.

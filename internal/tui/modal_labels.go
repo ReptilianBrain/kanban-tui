@@ -7,7 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"kanbantui/internal/db"
+	"github.com/ReptilianBrain/kanban-tui/internal/db"
 )
 
 // labelManagerModal lists labels and adds, renames and deletes them.

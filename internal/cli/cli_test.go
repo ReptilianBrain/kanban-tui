@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"kanbantui/internal/db"
+	"github.com/ReptilianBrain/kanban-tui/internal/db"
 )
 
 func TestValidateDue(t *testing.T) {

@@ -8,6 +8,7 @@ Columns: Backlog, In Progress, Blocked, In Review, Completed.
 ## Build and run
 
 ```bash
+go install github.com/ReptilianBrain/kanban-tui/cmd/kanban@latest   # or build from a clone:
 make build        # go build -o kanban ./cmd/kanban
 ./kanban          # no arguments: launch the TUI
 ./kanban --help   # with arguments: CLI

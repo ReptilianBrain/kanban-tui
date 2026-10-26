@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"kanbantui/internal/db"
+	"github.com/ReptilianBrain/kanban-tui/internal/db"
 )
 
 // exportCard is the reduced per-card shape used by export --json.

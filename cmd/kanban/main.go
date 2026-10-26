@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"os"
 
-	"kanbantui/internal/cli"
-	"kanbantui/internal/tui"
+	"github.com/ReptilianBrain/kanban-tui/internal/cli"
+	"github.com/ReptilianBrain/kanban-tui/internal/tui"
 )
 
 func main() {

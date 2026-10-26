@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"kanbantui/internal/db"
+	"github.com/ReptilianBrain/kanban-tui/internal/db"
 )
 
 func newNextCmd(ctx *appCtx) *cobra.Command {

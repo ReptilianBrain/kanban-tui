@@ -6,9 +6,9 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"kanbantui/internal/config"
-	"kanbantui/internal/db"
-	"kanbantui/internal/herdrsync"
+	"github.com/ReptilianBrain/kanban-tui/internal/config"
+	"github.com/ReptilianBrain/kanban-tui/internal/db"
+	"github.com/ReptilianBrain/kanban-tui/internal/herdrsync"
 )
 
 // handleBoardKey dispatches a keypress when no modal is open.

@@ -1,4 +1,4 @@
-module kanbantui
+module github.com/ReptilianBrain/kanban-tui
 
 go 1.25.4
 
