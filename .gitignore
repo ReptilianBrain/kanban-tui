@@ -1,0 +1,9 @@
+/kanban
+.DS_Store
+.idea/
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+.env
+*.db
+*.db-shm
+*.db-wal
