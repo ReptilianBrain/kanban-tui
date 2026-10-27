@@ -46,6 +46,10 @@ func (mm *matrixModal) Update(msg tea.Msg, m *Model) tea.Cmd {
 	switch k.String() {
 	case "esc", "q", "m":
 		m.popModal()
+		if m.matrixHome {
+			m.quitting = true
+			return tea.Quit
+		}
 	case "a":
 		mm.showAll = !mm.showAll
 	case "f":

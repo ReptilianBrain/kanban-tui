@@ -95,6 +95,10 @@ type Model struct {
 	// (the key that opened it) all quit.
 	popup bool
 
+	// matrixHome is set by KANBANTUI_START=matrix: the board opens straight
+	// into the Matrix, and closing it quits instead of revealing the board.
+	matrixHome bool
+
 	quitting bool
 }
 
@@ -115,6 +119,7 @@ func newModel(store *db.DB) *Model {
 		clock:       time.Now,
 		costDir:     cost.Dir(),
 		popup:       os.Getenv("KANBANTUI_POPUP") != "",
+		matrixHome:  os.Getenv("KANBANTUI_START") == "matrix",
 	}
 }
 
@@ -129,6 +134,10 @@ func Run() error {
 	m := newModel(store)
 	if err := m.loadData(); err != nil {
 		return fmt.Errorf("tui: loading board: %w", err)
+	}
+
+	if m.matrixHome {
+		m.actionMatrix()
 	}
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
@@ -311,7 +320,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(moved, pollAgentsCmd(agentPollEvery))
 
 	case tea.KeyMsg:
-		if k := msg.String(); k == "ctrl+c" || (m.popup && k == "f15") {
+		if k := msg.String(); k == "ctrl+c" || (m.popup && (k == "f15" || (m.matrixHome && k == "f20"))) {
 			m.quitting = true
 			return m, tea.Quit
 		}

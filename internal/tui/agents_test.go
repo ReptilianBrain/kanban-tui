@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/ReptilianBrain/kanban-tui/internal/db"
+	"github.com/ReptilianBrain/kanban-tui/internal/herdrsync"
 )
 
 func TestAgentsMsg_UpdatesKeepsAndClears(t *testing.T) {
@@ -131,5 +132,53 @@ func TestPopup_FooterAdvertisesTheCloseKeys(t *testing.T) {
 	m.popup = false
 	if v := m.View(); strings.Contains(v, "F15") {
 		t.Error("non-popup footer should not mention F15")
+	}
+}
+
+func TestPopup_HerdrOpenQuitsOnlyOnSuccess(t *testing.T) {
+	ok := herdrOpenDoneMsg{result: &herdrsync.OpenResult{Branch: "card-1-x"}}
+
+	m := newTestModel(t)
+	m.popup = true
+	m.Update(ok)
+	if !m.quitting {
+		t.Error("popup: a successful herdr open should quit")
+	}
+
+	m = newTestModel(t)
+	m.popup = true
+	m.Update(herdrOpenDoneMsg{err: errors.New("boom")})
+	if m.quitting {
+		t.Error("popup: a failed herdr open must stay open to show the error")
+	}
+
+	m = newTestModel(t)
+	m.Update(ok)
+	if m.quitting {
+		t.Error("not a popup: a successful herdr open must not quit")
+	}
+}
+
+func TestMatrixHome_CloseAndF20Quit(t *testing.T) {
+	m := newTestModel(t)
+	m.matrixHome = true
+	m.actionMatrix()
+	_, cmd := m.Update(key("esc"))
+	if !m.quitting || cmd == nil {
+		t.Error("matrix home: closing the Matrix should quit")
+	}
+
+	m = newTestModel(t)
+	m.popup, m.matrixHome = true, true
+	m.actionMatrix()
+	if _, cmd := m.Update(key("f20")); !m.quitting || cmd == nil {
+		t.Error("matrix home popup: f20 should quit")
+	}
+
+	m = newTestModel(t)
+	m.actionMatrix()
+	m.Update(key("esc"))
+	if m.quitting {
+		t.Error("regular board: closing the Matrix must return to the board")
 	}
 }

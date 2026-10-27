@@ -378,10 +378,17 @@ func (m *Model) handleHerdrOpenDone(msg herdrOpenDoneMsg) tea.Cmd {
 	if warn != "" {
 		kind = toastWarn
 	}
+	text := fmt.Sprintf("Opened %s in herdr, %s moved to %s%s", msg.result.Branch, cardNoun(), statusLabel["ongoing"], warn)
 	if msg.result.Reused {
-		return m.toast(kind, fmt.Sprintf("Reconnected to %s in herdr%s", msg.result.Branch, warn))
+		text = fmt.Sprintf("Reconnected to %s in herdr%s", msg.result.Branch, warn)
 	}
-	return m.toast(kind, fmt.Sprintf("Opened %s in herdr, %s moved to %s%s", msg.result.Branch, cardNoun(), statusLabel["ongoing"], warn))
+	// Herdr already focused the new workspace; a popup would keep holding
+	// input over it until the app exits, as after a Matrix jump.
+	if m.popup {
+		m.quitting = true
+		return tea.Quit
+	}
+	return m.toast(kind, text)
 }
 
 func (m *Model) actionRefresh() tea.Cmd {
