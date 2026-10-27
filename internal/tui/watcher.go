@@ -17,7 +17,8 @@ const flatlineAfter = 90 * time.Second
 // In Review stays with the session or the user.
 //
 // A card is only moved back by the watcher if the watcher moved it there
-// (autoBlocked); a card the user blocked by hand stays blocked.
+// (autoBlocked), as soon as its agent stops waiting; a card the user blocked
+// by hand stays blocked.
 type watcher struct {
 	waitingSince map[int64]time.Time // card id -> first poll seen waiting
 	autoBlocked  map[int64]bool      // cards this watcher moved to Blocked
@@ -78,11 +79,14 @@ func (m *Model) reconcileAgents(states map[int64]string) tea.Cmd {
 				cmds = append(cmds, m.toast(toastWarn, fmt.Sprintf(
 					"Wintermute: #%d to %s, its agent is waiting for input", id, statusLabel["blocked"])))
 			}
-		case state == "working" && status == "blocked" && w.autoBlocked[id]:
+		case state != "blocked" && status == "blocked" && w.autoBlocked[id]:
+			// Any state but waiting ends the reason for the block. An answered
+			// prompt can go waiting -> done inside one 3s poll, so "working"
+			// is not required.
 			if m.watcherMove(id, "ongoing") {
 				delete(w.autoBlocked, id)
 				cmds = append(cmds, m.toast(toastInfo, fmt.Sprintf(
-					"Wintermute: #%d back to %s, its agent resumed", id, statusLabel["ongoing"])))
+					"Wintermute: #%d back to %s, its agent is no longer waiting", id, statusLabel["ongoing"])))
 			}
 		}
 	}
