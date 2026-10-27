@@ -203,7 +203,7 @@ func (n *notesModal) View(m *Model) string {
 	b.WriteString("\n")
 	b.WriteString(modalHintStyle.Render(
 		"Enter:Add  ↑/↓:Select  Esc:List mode  Esc Esc:Close\n" +
-			"List mode — e:Edit  d:Delete  p:Promote to card  i:Type  o:Close",
+			"List mode — e:Edit  d:Delete  p:Promote to " + cardNoun() + "  i:Type  o:Close",
 	))
 	return renderModal(modalBoxStyle, 72, b.String())
 }

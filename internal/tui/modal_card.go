@@ -54,7 +54,7 @@ func newCardModal(store *db.DB, title, description, priority, dueDate string, la
 	labels, _ := store.GetLabels()
 
 	ti := textinput.New()
-	ti.Placeholder = "Card title…"
+	ti.Placeholder = cardTitle() + " title…"
 	styleInput(&ti, colorSurface)
 	ti.SetValue(title)
 
@@ -83,9 +83,9 @@ func newCardModal(store *db.DB, title, description, priority, dueDate string, la
 		}
 	}
 
-	heading := "New Card"
+	heading := "New " + cardTitle()
 	if cardID != nil {
-		heading = "Edit Card"
+		heading = "Edit " + cardTitle()
 	}
 
 	c := &cardModal{

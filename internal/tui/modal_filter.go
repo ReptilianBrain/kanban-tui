@@ -67,7 +67,7 @@ func (f *filterModal) View(m *Model) string {
 	if len(f.labels) == 0 {
 		body += modalHintStyle.Render("No labels defined — press 't' to manage labels.") + "\n\n"
 	} else {
-		name := "(all cards)"
+		name := "(all " + cardNouns() + ")"
 		if f.idx > 0 {
 			name = f.labels[f.idx-1].Name
 		}
