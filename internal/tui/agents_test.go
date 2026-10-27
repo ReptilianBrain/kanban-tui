@@ -70,3 +70,66 @@ func TestSkin(t *testing.T) {
 		}
 	}
 }
+
+func TestPopup_EscQAndF15Close(t *testing.T) {
+	quits := func(m *Model, k string) bool {
+		_, cmd := m.Update(key(k))
+		return m.quitting && cmd != nil
+	}
+
+	m := newTestModel(t)
+	m.popup = true
+	if !quits(m, "esc") {
+		t.Error("popup: esc at the bare board should quit")
+	}
+	for _, k := range []string{"q", "f15"} {
+		m = newTestModel(t)
+		m.popup = true
+		if !quits(m, k) {
+			t.Errorf("popup: %s should quit", k)
+		}
+	}
+
+	// esc still clears a filter first, and only the next esc closes
+	m = newTestModel(t)
+	m.popup = true
+	m.labelFilter = "Data"
+	if quits(m, "esc") {
+		t.Error("popup: esc with a filter active should clear it, not quit")
+	}
+	if m.labelFilter != "" {
+		t.Error("popup: esc should have cleared the filter")
+	}
+	if !quits(m, "esc") {
+		t.Error("popup: second esc should quit")
+	}
+
+	// F15 closes from inside a modal too
+	m = newTestModel(t)
+	m.popup = true
+	send(m, "m")
+	if !quits(m, "f15") {
+		t.Error("popup: f15 should quit from inside the Matrix")
+	}
+
+	// outside a popup: esc and f15 do nothing, q still quits
+	m = newTestModel(t)
+	if quits(m, "esc") || quits(m, "f15") {
+		t.Error("not a popup: esc and f15 must not quit")
+	}
+	if !quits(m, "q") {
+		t.Error("not a popup: q should still quit")
+	}
+}
+
+func TestPopup_FooterAdvertisesTheCloseKeys(t *testing.T) {
+	m := newTestModel(t)
+	m.popup = true
+	if v := m.View(); !strings.Contains(v, "Esc/q/F15:Close") {
+		t.Error("popup footer should say Esc/q/F15:Close")
+	}
+	m.popup = false
+	if v := m.View(); strings.Contains(v, "F15") {
+		t.Error("non-popup footer should not mention F15")
+	}
+}
