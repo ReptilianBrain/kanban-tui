@@ -17,26 +17,94 @@ import (
 // unreadable in a real terminal.
 //
 // matrixModal is the live monitor: the cards that have a herdr agent, with
-// the agent's state and, for a waiting agent, how long it has waited. "a" widens it to every card in flight (In Progress or
-// Blocked), since a board accumulates stale cards that have no agent. It is
-// read-only, so unlike other modals it does not pause the DB poll or the
-// watcher; see blockingModal.
-type matrixModal struct{ showAll bool }
+// the agent's state and, for a waiting agent, how long it has waited. "a"
+// widens it to every card in flight (In Progress or Blocked), since a board
+// accumulates stale cards that have no agent. Enter jumps to the selected
+// card's herdr pane. It never edits a card, so unlike other modals it does not
+// pause the DB poll or the watcher; see blockingModal.
+//
+// The selection follows the card id, not the row index: rows reorder as agent
+// states change, and the cursor must not slide onto another card.
+type matrixModal struct {
+	showAll bool
+	cursor  int
+	cardID  int64
+}
 
 func newMatrixModal() *matrixModal { return &matrixModal{} }
 
 func (*matrixModal) Init(*Model) tea.Cmd { return nil }
 
 func (mm *matrixModal) Update(msg tea.Msg, m *Model) tea.Cmd {
-	if k, ok := msg.(tea.KeyMsg); ok {
-		switch k.String() {
-		case "esc", "q", "m":
-			m.popModal()
-		case "a":
-			mm.showAll = !mm.showAll
-		}
+	k, ok := msg.(tea.KeyMsg)
+	if !ok {
+		return nil
+	}
+	switch k.String() {
+	case "esc", "q", "m":
+		m.popModal()
+	case "a":
+		mm.showAll = !mm.showAll
+	case "up", "k":
+		mm.move(m, -1)
+	case "down", "j":
+		mm.move(m, 1)
+	case "enter":
+		return mm.jump(m)
 	}
 	return nil
+}
+
+// sync resolves the selection against the current rows: the selected card
+// keeps the cursor wherever it moved, and when it left the list the cursor
+// stays at its index, clamped. It returns the cursor row, or -1 when empty.
+func (mm *matrixModal) sync(rows []matrixRow) int {
+	if len(rows) == 0 {
+		return -1
+	}
+	for i, r := range rows {
+		if mm.cardID != 0 && r.card.ID == mm.cardID {
+			mm.cursor = i
+			return i
+		}
+	}
+	if mm.cursor >= len(rows) {
+		mm.cursor = len(rows) - 1
+	}
+	if mm.cursor < 0 {
+		mm.cursor = 0
+	}
+	mm.cardID = rows[mm.cursor].card.ID
+	return mm.cursor
+}
+
+func (mm *matrixModal) move(m *Model, delta int) {
+	rows := m.matrixRows(mm.showAll)
+	i := mm.sync(rows)
+	if i < 0 {
+		return
+	}
+	i += delta
+	if i < 0 || i >= len(rows) {
+		return
+	}
+	mm.cursor, mm.cardID = i, rows[i].card.ID
+}
+
+// jump focuses the selected card's agent pane in herdr. The result comes back
+// as a matrixFocusDoneMsg, which closes the Matrix (and a popup).
+func (mm *matrixModal) jump(m *Model) tea.Cmd {
+	rows := m.matrixRows(mm.showAll)
+	i := mm.sync(rows)
+	if i < 0 {
+		return nil
+	}
+	pane := m.agentPanes[rows[i].card.ID]
+	if pane == "" {
+		return m.toast(toastWarn, fmt.Sprintf("No agent for this %s", cardNoun()))
+	}
+	focus := m.focusAgent
+	return func() tea.Msg { return matrixFocusDoneMsg{err: focus(pane)} }
 }
 
 // blockingModal reports whether an open modal should freeze the live
@@ -139,7 +207,8 @@ func (mm *matrixModal) View(m *Model) string {
 		b.WriteString(textStyle.Render(fmt.Sprintf("No agents running. a: show the %d %s in flight without one.", idle, cardNouns())))
 		b.WriteString("\n")
 	}
-	for _, r := range rows {
+	sel := mm.sync(rows)
+	for i, r := range rows {
 		agent := agentMarkup(r.agent)
 		if agent == "" {
 			agent = textStyle.Render("no agent")
@@ -148,7 +217,11 @@ func (mm *matrixModal) View(m *Model) string {
 		if c := m.cycleText(r.card.ID); c != "" {
 			cycle = textStyle.Render(c)
 		}
-		line := padCell(cyanStyle.Render(fmt.Sprintf("#%d", r.card.ID)), 6) +
+		bar := "  "
+		if i == sel {
+			bar = selectedBarStyle.Render("▌") + " "
+		}
+		line := bar + padCell(cyanStyle.Render(fmt.Sprintf("#%d", r.card.ID)), 6) +
 			padCell(boldStyle.Render(clipRunes(r.card.Title, 30)), 32) +
 			padCell(textStyle.Render(statusLabel[r.card.Status]), 12) +
 			padCell(agent, 12) +
@@ -160,6 +233,8 @@ func (mm *matrixModal) View(m *Model) string {
 		b.WriteString("\n")
 	}
 	b.WriteString("\n")
-	b.WriteString(cyanStyle.Render("a: agents only / all " + cardNouns() + " in flight   Cycle: total spend across sessions   Esc/m: close"))
+	b.WriteString(cyanStyle.Render("↑↓: select   Enter: jump to agent   a: agents only / all " + cardNouns() + " in flight   Esc/m: close"))
+	b.WriteString("\n")
+	b.WriteString(cyanStyle.Render("Cycle: total spend across sessions"))
 	return renderModal(modalBoxStyle, 112, b.String())
 }

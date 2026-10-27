@@ -13,6 +13,7 @@ import (
 
 	"github.com/ReptilianBrain/kanban-tui/internal/cost"
 	"github.com/ReptilianBrain/kanban-tui/internal/db"
+	"github.com/ReptilianBrain/kanban-tui/internal/herdrsync"
 )
 
 // cycleText renders a card's total spend (its Cycle), or "" with no data.
@@ -75,6 +76,11 @@ type Model struct {
 	// until the first poll answers or when herdr is not installed.
 	agents map[int64]string
 
+	// agentPanes maps card id to the herdr pane of the agent behind its
+	// status; focusAgent is a seam so tests never shell out.
+	agentPanes map[int64]string
+	focusAgent func(target string) error
+
 	// watch moves cards between In Progress and Blocked from agent state;
 	// clock is a seam so tests can fast-forward the waiting window.
 	watch *watcher
@@ -105,6 +111,7 @@ func newModel(store *db.DB) *Model {
 		searchInput: ti,
 		data:        map[string][]db.Card{},
 		watch:       newWatcher(),
+		focusAgent:  herdrsync.FocusAgent,
 		clock:       time.Now,
 		costDir:     cost.Dir(),
 		popup:       os.Getenv("KANBANTUI_POPUP") != "",
@@ -273,17 +280,32 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case matrixFocusDoneMsg:
+		if msg.err != nil {
+			return m, m.toast(toastError, msg.err.Error())
+		}
+		if len(m.modalStack) > 0 {
+			if _, ok := m.topModal().(*matrixModal); ok {
+				m.popModal()
+			}
+		}
+		if m.popup {
+			m.quitting = true
+			return m, tea.Quit
+		}
+		return m, nil
+
 	case herdrOpenDoneMsg:
 		return m, m.handleHerdrOpenDone(msg)
 
 	case agentsMsg:
 		if msg.disabled {
-			m.agents = nil
+			m.agents, m.agentPanes = nil, nil
 			return m, nil
 		}
 		var moved tea.Cmd
 		if msg.err == nil {
-			m.agents = msg.states
+			m.agents, m.agentPanes = msg.states, msg.panes
 			moved = m.reconcileAgents(msg.states)
 		}
 		return m, tea.Batch(moved, pollAgentsCmd(agentPollEvery))

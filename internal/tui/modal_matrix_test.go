@@ -1,12 +1,15 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/ReptilianBrain/kanban-tui/internal/db"
 )
@@ -180,5 +183,138 @@ func TestModals_UseNoMutedStylesOnTheSurface(t *testing.T) {
 				t.Errorf("%s uses %s on the modal surface; use modalHintStyle or textStyle", f, banned)
 			}
 		}
+	}
+}
+
+// matrixWithAgents opens the Matrix over two In Progress cards with agents:
+// a waiting one (sorted first) and an idle one.
+func matrixWithAgents(t *testing.T) (m *Model, first, second int64) {
+	t.Helper()
+	m = newTestModel(t)
+	first = addCard(t, m, "ongoing")
+	second = addCard(t, m, "ongoing")
+	m.agents = map[int64]string{first: "blocked", second: "idle"}
+	m.agentPanes = map[int64]string{first: "w1:p1", second: "w1:p2"}
+	send(m, "m")
+	return m, first, second
+}
+
+func TestMatrix_CursorMovesAndClamps(t *testing.T) {
+	m, first, second := matrixWithAgents(t)
+	mm := m.topModal().(*matrixModal)
+	mm.View(m)
+	if mm.cardID != first {
+		t.Fatalf("selection starts on %d, want the first row %d", mm.cardID, first)
+	}
+	send(m, "up")
+	if mm.cardID != first {
+		t.Errorf("up at the top moved the selection to %d", mm.cardID)
+	}
+	send(m, "down")
+	if mm.cardID != second {
+		t.Errorf("down: selection = %d, want %d", mm.cardID, second)
+	}
+	send(m, "j")
+	if mm.cardID != second {
+		t.Errorf("down at the bottom moved the selection to %d", mm.cardID)
+	}
+	send(m, "k")
+	if mm.cardID != first {
+		t.Errorf("k: selection = %d, want %d", mm.cardID, first)
+	}
+}
+
+func TestMatrix_SelectionFollowsTheCardWhenRowsReorder(t *testing.T) {
+	m, first, second := matrixWithAgents(t)
+	send(m, "down") // on the idle card
+	m.agents[second] = "blocked"
+	m.agents[first] = "done" // second now sorts above first
+	mm := m.topModal().(*matrixModal)
+	mm.View(m)
+	rows := m.matrixRows(false)
+	if rows[0].card.ID != second {
+		t.Fatalf("setup: rows[0] = %d, want %d", rows[0].card.ID, second)
+	}
+	if mm.cardID != second || mm.cursor != 0 {
+		t.Errorf("selection = card %d row %d, want card %d row 0", mm.cardID, mm.cursor, second)
+	}
+}
+
+func TestMatrix_SelectedRowShowsTheBarAndHint(t *testing.T) {
+	m, _, _ := matrixWithAgents(t)
+	view := m.topModal().View(m)
+	if strings.Count(view, "▌") != 1 {
+		t.Errorf("want exactly one selection bar:\n%s", view)
+	}
+	if !strings.Contains(view, "Enter: jump to agent") {
+		t.Errorf("hint lacks the jump key:\n%s", view)
+	}
+}
+
+// runCmd executes a Cmd that is known to be synchronous (the focus stub) and
+// feeds its message back through Update.
+func runCmd(m *Model, cmd tea.Cmd) {
+	if cmd != nil {
+		m.Update(cmd())
+	}
+}
+
+func TestMatrix_EnterFocusesTheSelectedAgentPane(t *testing.T) {
+	m, _, _ := matrixWithAgents(t)
+	var got []string
+	m.focusAgent = func(target string) error { got = append(got, target); return nil }
+
+	send(m, "down")
+	_, cmd := m.Update(key("enter"))
+	runCmd(m, cmd)
+	if len(got) != 1 || got[0] != "w1:p2" {
+		t.Fatalf("focused %v, want [w1:p2]", got)
+	}
+	if m.topModal() != nil {
+		t.Error("the Matrix should close after a jump")
+	}
+	if m.quitting {
+		t.Error("outside a popup the TUI must stay open")
+	}
+}
+
+func TestMatrix_EnterClosesAPopup(t *testing.T) {
+	m, _, _ := matrixWithAgents(t)
+	m.popup = true
+	m.focusAgent = func(string) error { return nil }
+	_, cmd := m.Update(key("enter"))
+	runCmd(m, cmd)
+	if !m.quitting {
+		t.Error("a popup keeps all input until the app exits, so a jump must quit it")
+	}
+}
+
+func TestMatrix_EnterWithoutAnAgentToastsAndFocusesNothing(t *testing.T) {
+	m := newTestModel(t)
+	id := addCard(t, m, "ongoing")
+	m.focusAgent = func(string) error { t.Error("focus called for an agentless card"); return nil }
+	send(m, "m")
+	send(m, "a") // widen to cards without an agent
+	mm := m.topModal().(*matrixModal)
+	mm.cardID = id
+	send(m, "enter")
+	if !strings.Contains(m.toastMsg, "No agent") {
+		t.Errorf("toast = %q, want a no-agent warning", m.toastMsg)
+	}
+	if m.topModal() == nil {
+		t.Error("the Matrix should stay open")
+	}
+}
+
+func TestMatrix_FocusErrorKeepsTheMatrixOpen(t *testing.T) {
+	m, _, _ := matrixWithAgents(t)
+	m.focusAgent = func(string) error { return errors.New("pane gone") }
+	_, cmd := m.Update(key("enter"))
+	runCmd(m, cmd)
+	if !strings.Contains(m.toastMsg, "pane gone") {
+		t.Errorf("toast = %q, want the herdr error", m.toastMsg)
+	}
+	if m.topModal() == nil {
+		t.Error("the Matrix should stay open after a failed jump")
 	}
 }

@@ -67,14 +67,41 @@ var statusRank = map[string]int{"blocked": 4, "working": 3, "idle": 2, "done": 1
 // agents with an unknown status are left out.
 func CardStates(agents []AgentInfo) map[int64]string {
 	states := map[int64]string{}
+	for id, a := range mostUrgent(agents) {
+		states[id] = a.Status
+	}
+	return states
+}
+
+// CardPanes maps card id to the pane of the agent CardStates reports for it,
+// so a jump lands on the pane the card's badge describes.
+func CardPanes(agents []AgentInfo) map[int64]string {
+	panes := map[int64]string{}
+	for id, a := range mostUrgent(agents) {
+		panes[id] = a.PaneID
+	}
+	return panes
+}
+
+func mostUrgent(agents []AgentInfo) map[int64]AgentInfo {
+	best := map[int64]AgentInfo{}
 	for _, a := range agents {
 		id, ok := CardID(a.CWD)
 		if !ok || statusRank[a.Status] == 0 {
 			continue
 		}
-		if statusRank[a.Status] > statusRank[states[id]] {
-			states[id] = a.Status
+		if statusRank[a.Status] > statusRank[best[id].Status] {
+			best[id] = a
 		}
 	}
-	return states
+	return best
+}
+
+// FocusAgent brings an agent's pane to the front in herdr. target is a pane
+// id or an agent name.
+func FocusAgent(target string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), worktreeTimeout)
+	defer cancel()
+	_, err := run(ctx, "focusing agent", "agent", "focus", target)
+	return err
 }

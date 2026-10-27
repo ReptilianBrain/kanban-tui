@@ -239,10 +239,7 @@ func OpenCard(repoPath, base, branch, agentName, label, prompt string) (*OpenRes
 		return nil, err
 	}
 	if pane != "" {
-		focusCtx, focusCancel := context.WithTimeout(context.Background(), worktreeTimeout)
-		_, err := run(focusCtx, "focusing existing agent", "agent", "focus", agentName)
-		focusCancel()
-		if err != nil {
+		if err := FocusAgent(agentName); err != nil {
 			return nil, err
 		}
 		return &OpenResult{Branch: branch, PaneID: pane, AgentName: agentName, Reused: true}, nil
