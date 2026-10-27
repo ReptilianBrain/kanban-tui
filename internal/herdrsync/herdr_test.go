@@ -213,14 +213,29 @@ func TestOpenCard_WorktreeCreateOtherFailurePropagates(t *testing.T) {
 }
 
 func TestSeedPrompt(t *testing.T) {
-	got := SeedPrompt(7, "Title", "Desc", "card-7-title")
+	got := SeedPrompt(7, "Title", "Desc", "", "card-7-title")
 	if !strings.Contains(got, "\nDesc\n") {
 		t.Errorf("prompt should include the description: %q", got)
 	}
 	if !strings.Contains(got, "card-7-title") {
 		t.Errorf("prompt should name the branch: %q", got)
 	}
-	if noDesc := SeedPrompt(7, "Title", "", "card-7-title"); strings.Contains(noDesc, "\n\n\n") {
+	if strings.Contains(got, "triage") {
+		t.Errorf("a plain card should not get the triage brief: %q", got)
+	}
+	if noDesc := SeedPrompt(7, "Title", "", "", "card-7-title"); strings.Contains(noDesc, "\n\n\n") {
 		t.Errorf("empty description should not leave a blank block: %q", noDesc)
+	}
+}
+
+func TestSeedPromptTriage(t *testing.T) {
+	got := SeedPrompt(7, "Run failed", "See run abc", TriageLabel, "card-7-run-failed")
+	for _, want := range []string{"triage mode", "triage-failure", "card-7 in --refs", "See run abc", "card-7-run-failed"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("incident prompt missing %q: %q", want, got)
+		}
+	}
+	if other := SeedPrompt(7, "T", "", "server", "b"); strings.Contains(other, "triage mode") {
+		t.Errorf("only the incident label should trigger the brief: %q", other)
 	}
 }

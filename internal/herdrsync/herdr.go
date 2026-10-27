@@ -199,13 +199,28 @@ func BranchName(cardID int64, title string) string {
 	return fmt.Sprintf("card-%d-%s", cardID, slug)
 }
 
+// TriageLabel marks a card as a problem to investigate rather than a task to
+// build; SeedPrompt then adds the standing triage-mode instructions.
+const TriageLabel = "incident"
+
+const triageBrief = "\nThis card is an incident: work in triage mode. Investigate first, and treat " +
+	"production as read-only (REST/CLI APIs and read-only connections, no writes, no SSH). " +
+	"Start with the triage-failure skill: `history <text>` for prior incidents, `fetch` when " +
+	"there is a Prefect run. Edit files only in this worktree; if a code fix is needed, make it " +
+	"here on this branch and say so, so the card can be shipped. Before finishing, log the " +
+	"finding with `triage-failure record` (put card-%d in --refs) and set the card to in_review.\n"
+
 // SeedPrompt builds the first message for the new Claude session: the card's
-// context and the state the board has already put it in.
-func SeedPrompt(cardID int64, title, description, branch string) string {
+// context and the state the board has already put it in. A card labelled
+// TriageLabel also gets the triage-mode instructions.
+func SeedPrompt(cardID int64, title, description, label, branch string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "You're picking up kanban card #%d: %s.\n", cardID, title)
 	if description != "" {
 		fmt.Fprintf(&b, "\n%s\n", description)
+	}
+	if label == TriageLabel {
+		fmt.Fprintf(&b, triageBrief, cardID)
 	}
 	fmt.Fprintf(&b, "\nYou're already on branch %q with the card moved to \"ongoing\". "+
 		"Work normally and keep the card's status up to date with the `kanban` CLI.", branch)

@@ -343,6 +343,10 @@ func (m *Model) actionOpenHerdr() tea.Cmd {
 	cardID := card.ID
 	title := card.Title
 	description := card.Description
+	cardLabel := ""
+	if card.Label != nil {
+		cardLabel = *card.Label
+	}
 
 	return m.pushModal(newHerdrRepoModal(repos, func(m *Model, repo config.RepoEntry) tea.Cmd {
 		m.herdrBusy = true
@@ -355,7 +359,7 @@ func (m *Model) actionOpenHerdr() tea.Cmd {
 		// The card move runs before OpenCard so the seed prompt can state it.
 		openCmd := func() tea.Msg {
 			_ = store.UpdateCardStatus(cardID, "ongoing")
-			prompt := herdrsync.SeedPrompt(cardID, title, description, branch)
+			prompt := herdrsync.SeedPrompt(cardID, title, description, cardLabel, branch)
 			result, err := herdrsync.OpenCard(repo.Path, repo.Base, branch, agentName, label, prompt)
 			return herdrOpenDoneMsg{cardID: cardID, result: result, err: err}
 		}
