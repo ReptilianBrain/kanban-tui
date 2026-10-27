@@ -30,7 +30,7 @@ func TestMatrix_OpensClosesAndListsInFlightCards(t *testing.T) {
 			t.Errorf("Matrix view lacks %q:\n%s", want, view)
 		}
 	}
-	if rows := m.matrixRows(false); len(rows) < 2 || rows[0].card.ID != waiting {
+	if rows := m.matrixRows(false, false); len(rows) < 2 || rows[0].card.ID != waiting {
 		t.Errorf("the card waiting on you should sort first, rows = %+v", rows)
 	}
 
@@ -231,7 +231,7 @@ func TestMatrix_SelectionFollowsTheCardWhenRowsReorder(t *testing.T) {
 	m.agents[first] = "done" // second now sorts above first
 	mm := m.topModal().(*matrixModal)
 	mm.View(m)
-	rows := m.matrixRows(false)
+	rows := m.matrixRows(false, false)
 	if rows[0].card.ID != second {
 		t.Fatalf("setup: rows[0] = %d, want %d", rows[0].card.ID, second)
 	}
@@ -316,5 +316,59 @@ func TestMatrix_FocusErrorKeepsTheMatrixOpen(t *testing.T) {
 	}
 	if m.topModal() == nil {
 		t.Error("the Matrix should stay open after a failed jump")
+	}
+}
+
+func TestMatrix_FlatlineHiddenByDefaultInAllMode(t *testing.T) {
+	m := newTestModel(t)
+	running := addCard(t, m, "ongoing")
+	parked := addCard(t, m, "blocked")
+	withAgent := addCard(t, m, "blocked")
+	m.agents = map[int64]string{withAgent: "idle"}
+
+	ids := func() map[int64]bool {
+		got := map[int64]bool{}
+		for _, r := range m.topModal().(*matrixModal).rows(m) {
+			got[r.card.ID] = true
+		}
+		return got
+	}
+
+	send(m, "m")
+	send(m, "a")
+	got := ids()
+	if !got[running] || !got[withAgent] {
+		t.Errorf("all mode should list the ongoing card and the Blocked one with an agent: %v", got)
+	}
+	if got[parked] {
+		t.Errorf("an agentless Blocked card must be hidden by default: %v", got)
+	}
+	if view := m.topModal().View(m); !strings.Contains(view, "f: show "+statusLabel["blocked"]) || !strings.Contains(view, "hidden") {
+		t.Errorf("hint should offer f with the hidden count:\n%s", view)
+	}
+
+	send(m, "f")
+	if !ids()[parked] {
+		t.Error("f should reveal the agentless Blocked cards")
+	}
+	if view := m.topModal().View(m); !strings.Contains(view, "f: hide "+statusLabel["blocked"]) {
+		t.Errorf("hint should offer hiding once shown:\n%s", view)
+	}
+
+	send(m, "f")
+	if ids()[parked] {
+		t.Error("f again should hide them")
+	}
+}
+
+func TestMatrix_FlatlineKeyIsInertInAgentsOnlyMode(t *testing.T) {
+	m := newTestModel(t)
+	send(m, "m")
+	send(m, "f")
+	if m.topModal().(*matrixModal).showFlatline {
+		t.Error("f must do nothing until the all-cards view is on")
+	}
+	if view := m.topModal().View(m); strings.Contains(view, "f: ") {
+		t.Errorf("no f hint outside the all-cards view:\n%s", view)
 	}
 }

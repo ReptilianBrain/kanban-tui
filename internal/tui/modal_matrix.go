@@ -19,16 +19,19 @@ import (
 // matrixModal is the live monitor: the cards that have a herdr agent, with
 // the agent's state and, for a waiting agent, how long it has waited. "a"
 // widens it to every card in flight (In Progress or Blocked), since a board
-// accumulates stale cards that have no agent. Enter jumps to the selected
+// accumulates stale cards that have no agent; "f" then shows the agentless
+// Blocked ones too, hidden by default because they are parked on purpose and
+// would bury the cards in motion. Enter jumps to the selected
 // card's herdr pane. It never edits a card, so unlike other modals it does not
 // pause the DB poll or the watcher; see blockingModal.
 //
 // The selection follows the card id, not the row index: rows reorder as agent
 // states change, and the cursor must not slide onto another card.
 type matrixModal struct {
-	showAll bool
-	cursor  int
-	cardID  int64
+	showAll      bool
+	showFlatline bool
+	cursor       int
+	cardID       int64
 }
 
 func newMatrixModal() *matrixModal { return &matrixModal{} }
@@ -45,6 +48,10 @@ func (mm *matrixModal) Update(msg tea.Msg, m *Model) tea.Cmd {
 		m.popModal()
 	case "a":
 		mm.showAll = !mm.showAll
+	case "f":
+		if mm.showAll {
+			mm.showFlatline = !mm.showFlatline
+		}
 	case "up", "k":
 		mm.move(m, -1)
 	case "down", "j":
@@ -79,7 +86,7 @@ func (mm *matrixModal) sync(rows []matrixRow) int {
 }
 
 func (mm *matrixModal) move(m *Model, delta int) {
-	rows := m.matrixRows(mm.showAll)
+	rows := mm.rows(m)
 	i := mm.sync(rows)
 	if i < 0 {
 		return
@@ -94,7 +101,7 @@ func (mm *matrixModal) move(m *Model, delta int) {
 // jump focuses the selected card's agent pane in herdr. The result comes back
 // as a matrixFocusDoneMsg, which closes the Matrix (and a popup).
 func (mm *matrixModal) jump(m *Model) tea.Cmd {
-	rows := m.matrixRows(mm.showAll)
+	rows := mm.rows(m)
 	i := mm.sync(rows)
 	if i < 0 {
 		return nil
@@ -129,14 +136,20 @@ type matrixRow struct {
 // agentRank orders rows: an agent waiting on you first, no agent last.
 var agentRank = map[string]int{"blocked": 0, "working": 1, "idle": 2, "done": 3, "": 4}
 
+// rows is what the modal currently lists.
+func (mm *matrixModal) rows(m *Model) []matrixRow {
+	return m.matrixRows(mm.showAll, mm.showFlatline)
+}
+
 // matrixRows lists the cards with an agent, most urgent first; all adds the
-// agentless cards in In Progress or Blocked.
-func (m *Model) matrixRows(all bool) []matrixRow {
+// agentless cards in In Progress, and flatline also the agentless Blocked
+// ones. A Blocked card with an agent is always listed.
+func (m *Model) matrixRows(all, flatline bool) []matrixRow {
 	var rows []matrixRow
 	for _, cards := range m.data {
 		for _, c := range cards {
 			agent := m.agents[c.ID]
-			inFlight := c.Status == "ongoing" || c.Status == "blocked"
+			inFlight := c.Status == "ongoing" || (flatline && c.Status == "blocked")
 			if agent == "" && !(all && inFlight) {
 				continue
 			}
@@ -186,8 +199,9 @@ func (m *Model) watchNote(r matrixRow) string {
 }
 
 func (mm *matrixModal) View(m *Model) string {
-	rows := m.matrixRows(mm.showAll)
-	idle := len(m.matrixRows(true)) - len(m.matrixRows(false))
+	rows := mm.rows(m)
+	idle := len(m.matrixRows(true, mm.showFlatline)) - len(m.matrixRows(false, false))
+	hidden := len(m.matrixRows(true, true)) - len(m.matrixRows(true, false))
 	waiting := 0
 	for _, r := range rows {
 		if r.agent == "blocked" {
@@ -233,7 +247,18 @@ func (mm *matrixModal) View(m *Model) string {
 		b.WriteString("\n")
 	}
 	b.WriteString("\n")
-	b.WriteString(cyanStyle.Render("↑↓: select   Enter: jump to agent   a: agents only / all " + cardNouns() + " in flight   Esc/m: close"))
+	hint := "↑↓: select   Enter: jump to agent   a: agents only / all " + cardNouns() + " in flight"
+	if mm.showAll {
+		switch {
+		case mm.showFlatline:
+			hint += "   f: hide " + statusLabel["blocked"]
+		case hidden > 0:
+			hint += fmt.Sprintf("   f: show %s (%d hidden)", statusLabel["blocked"], hidden)
+		default:
+			hint += "   f: show " + statusLabel["blocked"]
+		}
+	}
+	b.WriteString(cyanStyle.Render(hint + "   Esc/m: close"))
 	b.WriteString("\n")
 	b.WriteString(cyanStyle.Render("Cycle: total spend across sessions"))
 	return renderModal(modalBoxStyle, 112, b.String())
