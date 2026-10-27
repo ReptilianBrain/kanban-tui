@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -17,8 +16,7 @@ import (
 // unreadable in a real terminal.
 //
 // matrixModal is the live monitor: the cards that have a herdr agent, with
-// the agent's state and, for a waiting agent, how long it has waited. "a"
-// widens it to every card in flight (In Progress or Blocked), since a board
+// the agent's state. "a" widens it to every card in flight (In Progress or Blocked), since a board
 // accumulates stale cards that have no agent; "f" then shows the agentless
 // Blocked ones too, hidden by default because they are parked on purpose and
 // would bury the cards in motion. Enter jumps to the selected
@@ -185,23 +183,6 @@ func clipRunes(s string, n int) string {
 	return strings.TrimRight(string(r[:n-1]), " ") + "…"
 }
 
-// formatWait renders a duration as m:ss.
-func formatWait(d time.Duration) string {
-	if d < 0 {
-		d = 0
-	}
-	s := int(d.Seconds())
-	return fmt.Sprintf("%d:%02d", s/60, s%60)
-}
-
-// watchNote says how long a row's agent has been waiting on you, if it is.
-func (m *Model) watchNote(r matrixRow) string {
-	if since, ok := m.watch.waitingSince[r.card.ID]; ok && r.card.Status == "ongoing" {
-		return warnStyle.Render("waiting " + formatWait(m.clock().Sub(since)))
-	}
-	return ""
-}
-
 func (mm *matrixModal) View(m *Model) string {
 	rows := mm.rows(m)
 	idle := len(m.matrixRows(true, mm.showFlatline)) - len(m.matrixRows(false, false))
@@ -244,9 +225,6 @@ func (mm *matrixModal) View(m *Model) string {
 			padCell(textStyle.Render(statusLabel[r.card.Status]), 12) +
 			padCell(agent, 12) +
 			padCell(cycle, 9)
-		if note := m.watchNote(r); note != "" {
-			line += note
-		}
 		b.WriteString(line)
 		b.WriteString("\n")
 	}

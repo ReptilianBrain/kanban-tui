@@ -40,7 +40,7 @@ func TestMatrix_OpensClosesAndListsInFlightCards(t *testing.T) {
 	}
 }
 
-func TestMatrix_ShowsHowLongTheAgentHasWaited(t *testing.T) {
+func TestMatrix_ShowsWaitingStateWithoutATimer(t *testing.T) {
 	m := newTestModel(t)
 	id := addCard(t, m, "ongoing")
 	m.agents = map[int64]string{id: "blocked"}
@@ -49,8 +49,11 @@ func TestMatrix_ShowsHowLongTheAgentHasWaited(t *testing.T) {
 
 	send(m, "m")
 	view := m.topModal().View(m)
-	if !strings.Contains(view, "waiting 0:30") {
-		t.Errorf("want 0:30 after 30s of waiting, got:\n%s", view)
+	if !strings.Contains(view, "waiting") {
+		t.Errorf("want the waiting state, got:\n%s", view)
+	}
+	if strings.Contains(view, "0:30") {
+		t.Errorf("the wait timer should not be shown, got:\n%s", view)
 	}
 }
 
