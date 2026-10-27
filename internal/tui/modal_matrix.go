@@ -12,22 +12,25 @@ import (
 	"github.com/ReptilianBrain/kanban-tui/internal/db"
 )
 
-// matrixModal is the live monitor: every card in flight (In Progress or
-// Blocked, or with a herdr agent anywhere) with its agent state and, for a
-// waiting agent, how long until the watcher blocks the card. It is read-only,
-// so unlike other modals it does not pause the DB poll or the watcher; see
-// blockingModal.
-type matrixModal struct{}
+// matrixModal is the live monitor: the cards that have a herdr agent, with
+// the agent's state and, for a waiting agent, how long until the watcher
+// blocks the card. "a" widens it to every card in flight (In Progress or
+// Blocked), since a board accumulates stale cards that have no agent. It is
+// read-only, so unlike other modals it does not pause the DB poll or the
+// watcher; see blockingModal.
+type matrixModal struct{ showAll bool }
 
 func newMatrixModal() *matrixModal { return &matrixModal{} }
 
 func (*matrixModal) Init(*Model) tea.Cmd { return nil }
 
-func (*matrixModal) Update(msg tea.Msg, m *Model) tea.Cmd {
+func (mm *matrixModal) Update(msg tea.Msg, m *Model) tea.Cmd {
 	if k, ok := msg.(tea.KeyMsg); ok {
 		switch k.String() {
 		case "esc", "q", "m":
 			m.popModal()
+		case "a":
+			mm.showAll = !mm.showAll
 		}
 	}
 	return nil
@@ -55,13 +58,15 @@ type matrixRow struct {
 // agentRank orders rows: an agent waiting on you first, no agent last.
 var agentRank = map[string]int{"blocked": 0, "working": 1, "idle": 2, "done": 3, "": 4}
 
-// matrixRows lists the cards in flight, most urgent first.
-func (m *Model) matrixRows() []matrixRow {
+// matrixRows lists the cards with an agent, most urgent first; all adds the
+// agentless cards in In Progress or Blocked.
+func (m *Model) matrixRows(all bool) []matrixRow {
 	var rows []matrixRow
 	for _, cards := range m.data {
 		for _, c := range cards {
 			agent := m.agents[c.ID]
-			if agent == "" && c.Status != "ongoing" && c.Status != "blocked" {
+			inFlight := c.Status == "ongoing" || c.Status == "blocked"
+			if agent == "" && !(all && inFlight) {
 				continue
 			}
 			rows = append(rows, matrixRow{card: c, agent: agent})
@@ -116,8 +121,9 @@ func (m *Model) watchNote(r matrixRow) string {
 	return ""
 }
 
-func (*matrixModal) View(m *Model) string {
-	rows := m.matrixRows()
+func (mm *matrixModal) View(m *Model) string {
+	rows := m.matrixRows(mm.showAll)
+	idle := len(m.matrixRows(true)) - len(m.matrixRows(false))
 	waiting := 0
 	for _, r := range rows {
 		if r.agent == "blocked" {
@@ -127,10 +133,14 @@ func (*matrixModal) View(m *Model) string {
 
 	var b strings.Builder
 	b.WriteString(accentBold.Render("Matrix"))
-	b.WriteString("  " + hintStyle.Render(fmt.Sprintf("%d in flight, %d waiting on you", len(rows), waiting)))
+	b.WriteString("  " + hintStyle.Render(fmt.Sprintf("%d shown, %d waiting on you", len(rows), waiting)))
 	b.WriteString("\n\n")
-	if len(rows) == 0 {
+	switch {
+	case len(rows) == 0 && idle == 0:
 		b.WriteString(dimStyle.Render("Nothing in flight."))
+		b.WriteString("\n")
+	case len(rows) == 0:
+		b.WriteString(dimStyle.Render(fmt.Sprintf("No agents running. a: show the %d cards in flight without one.", idle)))
 		b.WriteString("\n")
 	}
 	for _, r := range rows {
@@ -154,6 +164,6 @@ func (*matrixModal) View(m *Model) string {
 		b.WriteString("\n")
 	}
 	b.WriteString("\n")
-	b.WriteString(hintStyle.Render("Cycle is the card's total spend across sessions   Updates live   Esc/m: close"))
+	b.WriteString(hintStyle.Render("a: agents only / all in flight   Cycle: total spend across sessions   Esc/m: close"))
 	return renderModal(modalBoxStyle, 112, b.String())
 }

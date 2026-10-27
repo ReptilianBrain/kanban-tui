@@ -27,7 +27,7 @@ func TestMatrix_OpensClosesAndListsInFlightCards(t *testing.T) {
 			t.Errorf("Matrix view lacks %q:\n%s", want, view)
 		}
 	}
-	if rows := m.matrixRows(); len(rows) < 2 || rows[0].card.ID != waiting {
+	if rows := m.matrixRows(false); len(rows) < 2 || rows[0].card.ID != waiting {
 		t.Errorf("the card waiting on you should sort first, rows = %+v", rows)
 	}
 
@@ -83,6 +83,7 @@ func TestMatrix_EmptyBoard(t *testing.T) {
 func TestMatrix_ShowsCycleFromTheCostFiles(t *testing.T) {
 	m := newTestModel(t)
 	id := addCard(t, m, "ongoing")
+	m.agents = map[int64]string{id: "working"}
 	if view := newMatrixModal().View(m); strings.Contains(view, "$") {
 		t.Fatalf("no cost recorded yet, view should show no amount:\n%s", view)
 	}
@@ -98,5 +99,31 @@ func TestMatrix_ShowsCycleFromTheCostFiles(t *testing.T) {
 	card, _ := m.store.GetCard(id)
 	if view := newCardDetailModal(*card).View(m); !strings.Contains(view, "Cycle: $1.75") {
 		t.Errorf("card detail lacks the Cycle:\n%s", view)
+	}
+}
+
+func TestMatrix_AgentsOnlyByDefaultAndAToggles(t *testing.T) {
+	m := newTestModel(t)
+	withAgent := addCard(t, m, "ongoing")
+	stale := addCard(t, m, "ongoing")
+	m.agents = map[int64]string{withAgent: "working"}
+
+	send(m, "m")
+	view := m.topModal().View(m)
+	if strings.Contains(view, fmt.Sprintf("#%d ", stale)) {
+		t.Errorf("a card without an agent should be hidden by default:\n%s", view)
+	}
+	send(m, "a")
+	if view := m.topModal().View(m); !strings.Contains(view, fmt.Sprintf("#%d ", stale)) {
+		t.Errorf("a should show the agentless card:\n%s", view)
+	}
+}
+
+func TestMatrix_NoAgentsHintsAtTheHiddenCards(t *testing.T) {
+	m := newTestModel(t)
+	addCard(t, m, "ongoing")
+	m.agents = nil
+	if view := newMatrixModal().View(m); !strings.Contains(view, "No agents running") {
+		t.Errorf("want the no-agents hint:\n%s", view)
 	}
 }
