@@ -201,7 +201,7 @@ func BranchName(cardID int64, title string) string {
 
 // TriageLabel marks a card as a problem to investigate rather than a task to
 // build; SeedPrompt then adds the standing triage-mode instructions.
-const TriageLabel = "incident"
+const TriageLabel = "Incident"
 
 const triageBrief = "\nThis card is an incident: work in triage mode. Investigate first, and treat " +
 	"production as read-only (REST/CLI APIs and read-only connections, no writes, no SSH). " +
