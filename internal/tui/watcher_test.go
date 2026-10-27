@@ -137,3 +137,38 @@ func TestWatcher_UnknownCardIsIgnored(t *testing.T) {
 	reconcileAt(m, 0, map[int64]string{9999: "blocked"})
 	reconcileAt(m, time.Hour, map[int64]string{9999: "blocked"})
 }
+
+// Found live: after a permission prompt was approved the agent went waiting ->
+// done inside one 3s poll and was never seen "working".
+func TestWatcher_ReturnsTheCardWhenTheAgentStopsWaitingInAnyState(t *testing.T) {
+	for _, next := range []string{"working", "idle", "done"} {
+		m := newTestModel(t)
+		id := addCard(t, m, "ongoing")
+		waiting := map[int64]string{id: "blocked"}
+		reconcileAt(m, 0, waiting)
+		reconcileAt(m, flatlineAfter+time.Second, waiting)
+		if got := statusOf(t, m, id); got != "blocked" {
+			t.Fatalf("%s: setup: status = %q, want blocked", next, got)
+		}
+		reconcileAt(m, flatlineAfter+4*time.Second, map[int64]string{id: next})
+		if got := statusOf(t, m, id); got != "ongoing" {
+			t.Errorf("agent %s after waiting: status = %q, want ongoing", next, got)
+		}
+	}
+}
+
+func TestWatcher_KeepsTheCardBlockedWhenTheAgentIsGone(t *testing.T) {
+	m := newTestModel(t)
+	id := addCard(t, m, "ongoing")
+	waiting := map[int64]string{id: "blocked"}
+	reconcileAt(m, 0, waiting)
+	reconcileAt(m, flatlineAfter+time.Second, waiting)
+
+	reconcileAt(m, time.Hour, map[int64]string{}) // agent exited
+	if got := statusOf(t, m, id); got != "blocked" {
+		t.Errorf("status = %q, want blocked kept when the agent is gone", got)
+	}
+	if m.watch.autoBlocked[id] {
+		t.Error("tracking should be dropped once the agent is gone")
+	}
+}
