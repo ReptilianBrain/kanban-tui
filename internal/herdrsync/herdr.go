@@ -219,7 +219,7 @@ func SeedPrompt(cardID int64, title, description, label, branch string) string {
 	if description != "" {
 		fmt.Fprintf(&b, "\n%s\n", description)
 	}
-	if label == TriageLabel {
+	if strings.EqualFold(label, TriageLabel) {
 		fmt.Fprintf(&b, triageBrief, cardID)
 	}
 	fmt.Fprintf(&b, "\nYou're already on branch %q with the card moved to \"ongoing\". "+

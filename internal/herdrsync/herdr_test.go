@@ -235,6 +235,9 @@ func TestSeedPromptTriage(t *testing.T) {
 			t.Errorf("incident prompt missing %q: %q", want, got)
 		}
 	}
+	if capped := SeedPrompt(7, "T", "", "Incident", "b"); !strings.Contains(capped, "triage mode") {
+		t.Errorf("label match should ignore case: %q", capped)
+	}
 	if other := SeedPrompt(7, "T", "", "server", "b"); strings.Contains(other, "triage mode") {
 		t.Errorf("only the incident label should trigger the brief: %q", other)
 	}
