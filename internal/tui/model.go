@@ -4,6 +4,7 @@ package tui
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"time"
 
@@ -82,6 +83,12 @@ type Model struct {
 	// costDir holds the per-card spend files (see internal/cost).
 	costDir string
 
+	// popup is set by KANBANTUI_POPUP=1 (the herdr keys.command that opens the
+	// board in a popup). A popup receives all terminal input until the app
+	// exits, so closing it is the app's job: Esc at the board, q, and F15
+	// (the key that opened it) all quit.
+	popup bool
+
 	quitting bool
 }
 
@@ -100,6 +107,7 @@ func newModel(store *db.DB) *Model {
 		watch:       newWatcher(),
 		clock:       time.Now,
 		costDir:     cost.Dir(),
+		popup:       os.Getenv("KANBANTUI_POPUP") != "",
 	}
 }
 
@@ -281,7 +289,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(moved, pollAgentsCmd(agentPollEvery))
 
 	case tea.KeyMsg:
-		if msg.String() == "ctrl+c" {
+		if k := msg.String(); k == "ctrl+c" || (m.popup && k == "f15") {
 			m.quitting = true
 			return m, tea.Quit
 		}

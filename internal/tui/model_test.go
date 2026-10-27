@@ -116,6 +116,8 @@ func key(s string) tea.KeyMsg {
 		return tea.KeyMsg{Type: tea.KeyShiftRight}
 	case "backspace":
 		return tea.KeyMsg{Type: tea.KeyBackspace}
+	case "f15":
+		return tea.KeyMsg{Type: tea.KeyF15}
 	default:
 		return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)}
 	}

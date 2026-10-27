@@ -45,6 +45,12 @@ func (m *Model) handleBoardKey(msg tea.KeyMsg) tea.Cmd {
 	case "/":
 		return m.actionSearch()
 	case "esc":
+		// In a herdr popup nothing else closes the app, so Esc with no filter
+		// or search left to clear quits.
+		if m.popup && m.labelFilter == "" && m.searchQuery == "" {
+			m.quitting = true
+			return tea.Quit
+		}
 		return m.actionClearFilter()
 	case "t":
 		return m.actionManageLabels()

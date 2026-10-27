@@ -59,6 +59,9 @@ func (m *Model) renderBoardFrame() string {
 	// Unlike the title and toast bars, the footer hint may wrap: an explicit
 	// Width makes it real lines, which lipgloss.Height below counts.
 	hint := footerHint
+	if m.popup {
+		hint = strings.Replace(hint, "q:Quit", "Esc/q/F15:Close", 1)
+	}
 	if m.searching {
 		hint = searchHint
 	}
