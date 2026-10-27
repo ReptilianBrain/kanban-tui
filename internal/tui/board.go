@@ -291,7 +291,7 @@ func (m *Model) actionNotes() tea.Cmd {
 				_ = m.store.DeleteNote(note.ID)
 				_ = m.loadData()
 				m.selectCard(status, id)
-				return m.toast(toastInfo, fmt.Sprintf("Note promoted to card in %s", statusLabel[status]))
+				return m.toast(toastInfo, fmt.Sprintf("Note promoted to %s in %s", cardNoun(), statusLabel[status]))
 			}))
 	}))
 }
@@ -311,7 +311,7 @@ func (m *Model) actionToggleCompleted() tea.Cmd {
 	if !m.showEnds {
 		state = "hidden"
 	}
-	return m.toast(toastInfo, "Backlog/Completed columns "+state)
+	return m.toast(toastInfo, statusLabel["todo"]+"/"+statusLabel["completed"]+" columns "+state)
 }
 
 // herdrOpenDoneMsg reports the result of the herdr pickup, which opens the
@@ -372,7 +372,7 @@ func (m *Model) handleHerdrOpenDone(msg herdrOpenDoneMsg) tea.Cmd {
 	warn := ""
 	// The pickup just moved the card into In Progress; flag a blown WIP limit.
 	if limit, n := wipLimits["ongoing"], len(m.data["ongoing"]); limit > 0 && n > limit {
-		warn += fmt.Sprintf(" — In Progress over WIP limit (%d/%d)", n, limit)
+		warn += fmt.Sprintf(" — %s over WIP limit (%d/%d)", statusLabel["ongoing"], n, limit)
 	}
 	kind := toastInfo
 	if warn != "" {
@@ -381,7 +381,7 @@ func (m *Model) handleHerdrOpenDone(msg herdrOpenDoneMsg) tea.Cmd {
 	if msg.result.Reused {
 		return m.toast(kind, fmt.Sprintf("Reconnected to %s in herdr%s", msg.result.Branch, warn))
 	}
-	return m.toast(kind, fmt.Sprintf("Opened %s in herdr, card moved to In Progress%s", msg.result.Branch, warn))
+	return m.toast(kind, fmt.Sprintf("Opened %s in herdr, %s moved to %s%s", msg.result.Branch, cardNoun(), statusLabel["ongoing"], warn))
 }
 
 func (m *Model) actionRefresh() tea.Cmd {

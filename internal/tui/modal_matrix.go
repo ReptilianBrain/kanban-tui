@@ -144,7 +144,7 @@ func (mm *matrixModal) View(m *Model) string {
 		b.WriteString(textStyle.Render("Nothing in flight."))
 		b.WriteString("\n")
 	case len(rows) == 0:
-		b.WriteString(textStyle.Render(fmt.Sprintf("No agents running. a: show the %d cards in flight without one.", idle)))
+		b.WriteString(textStyle.Render(fmt.Sprintf("No agents running. a: show the %d %s in flight without one.", idle, cardNouns())))
 		b.WriteString("\n")
 	}
 	for _, r := range rows {
@@ -168,6 +168,6 @@ func (mm *matrixModal) View(m *Model) string {
 		b.WriteString("\n")
 	}
 	b.WriteString("\n")
-	b.WriteString(cyanStyle.Render("a: agents only / all in flight   Cycle: total spend across sessions   Esc/m: close"))
+	b.WriteString(cyanStyle.Render("a: agents only / all " + cardNouns() + " in flight   Cycle: total spend across sessions   Esc/m: close"))
 	return renderModal(modalBoxStyle, 112, b.String())
 }

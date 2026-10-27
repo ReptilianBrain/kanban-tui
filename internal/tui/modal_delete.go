@@ -36,7 +36,7 @@ func (d *deleteConfirmModal) Update(msg tea.Msg, m *Model) tea.Cmd {
 func (d *deleteConfirmModal) View(m *Model) string {
 	body := fmt.Sprintf(
 		"%s\n\n%s\n\n%s\n\n%s",
-		errorBoldStyle.Render("Delete Card?"),
+		errorBoldStyle.Render("Delete "+cardTitle()+"?"),
 		boldStyle.Render(d.cardTitle),
 		modalHintStyle.Render("This action cannot be undone."),
 		modalHintStyle.Render("No [n]     Yes [y]"),
