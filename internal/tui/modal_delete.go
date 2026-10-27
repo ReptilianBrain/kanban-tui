@@ -38,8 +38,8 @@ func (d *deleteConfirmModal) View(m *Model) string {
 		"%s\n\n%s\n\n%s\n\n%s",
 		errorBoldStyle.Render("Delete Card?"),
 		boldStyle.Render(d.cardTitle),
-		hintStyle.Render("This action cannot be undone."),
-		hintStyle.Render("No [n]     Yes [y]"),
+		modalHintStyle.Render("This action cannot be undone."),
+		modalHintStyle.Render("No [n]     Yes [y]"),
 	)
 	return renderModal(modalDangerStyle, 52, body)
 }

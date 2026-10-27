@@ -52,16 +52,16 @@ func (h *herdrRepoModal) Update(msg tea.Msg, m *Model) tea.Cmd {
 func (h *herdrRepoModal) View(m *Model) string {
 	body := accentBold.Render("Open in herdr") + "\n\n"
 	if len(h.repos) == 0 {
-		body += hintStyle.Render("No repos configured — add one to ~/.kanbantui/repos.json") + "\n\n"
+		body += modalHintStyle.Render("No repos configured — add one to ~/.kanbantui/repos.json") + "\n\n"
 	} else {
 		entry := h.repos[h.idx]
 		body += pickerValue(entry.Name, true) + "\n"
-		body += hintStyle.Render(entry.Path) + "\n"
+		body += modalHintStyle.Render(entry.Path) + "\n"
 		if entry.Base != "" {
-			body += hintStyle.Render("base: "+entry.Base) + "\n"
+			body += modalHintStyle.Render("base: "+entry.Base) + "\n"
 		}
 		body += "\n"
 	}
-	body += hintStyle.Render("←/→: change   Enter: open   Esc: cancel")
+	body += modalHintStyle.Render("←/→: change   Enter: open   Esc: cancel")
 	return renderModal(modalBoxStyle, 60, body)
 }

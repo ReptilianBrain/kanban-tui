@@ -99,8 +99,11 @@ var (
 	modalWarnBoxStyle = modalBoxStyle.BorderForeground(colorWarning)
 	modalDangerStyle  = modalBoxStyle.BorderForeground(colorError)
 
-	hintStyle   = lipgloss.NewStyle().Foreground(colorMuted)
-	errMsgStyle = lipgloss.NewStyle().Foreground(colorError).Bold(true)
+	hintStyle = lipgloss.NewStyle().Foreground(colorMuted)
+	// modalHintStyle is the hint/secondary text for anything drawn on the modal
+	// surface (nord1), where hintStyle's nord3 is about 1.3:1 and unreadable.
+	modalHintStyle = lipgloss.NewStyle().Foreground(colorCyan)
+	errMsgStyle    = lipgloss.NewStyle().Foreground(colorError).Bold(true)
 
 	// Selected-row bar for the notes and label-manager lists, like cardSelectedStyle.
 	selectedBarStyle = lipgloss.NewStyle().Foreground(colorAccent).Bold(true)

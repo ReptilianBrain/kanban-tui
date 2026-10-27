@@ -12,6 +12,10 @@ import (
 	"github.com/ReptilianBrain/kanban-tui/internal/db"
 )
 
+// Text on the modal surface (nord1) uses Snow Storm (textStyle) and Frost
+// (cyanStyle), never dimStyle/hintStyle: nord3 on nord1 is about 1.3:1 and
+// unreadable in a real terminal.
+//
 // matrixModal is the live monitor: the cards that have a herdr agent, with
 // the agent's state and, for a waiting agent, how long until the watcher
 // blocks the card. "a" widens it to every card in flight (In Progress or
@@ -116,7 +120,7 @@ func (m *Model) watchNote(r matrixRow) string {
 		return warnStyle.Render(fmt.Sprintf("Flatline in %s (waited %s)", formatWait(left), formatWait(m.clock().Sub(since))))
 	}
 	if m.watch.autoBlocked[r.card.ID] {
-		return dimStyle.Render("auto-blocked, returns when the agent resumes")
+		return textStyle.Render("auto-blocked, returns when the agent resumes")
 	}
 	return ""
 }
@@ -133,26 +137,26 @@ func (mm *matrixModal) View(m *Model) string {
 
 	var b strings.Builder
 	b.WriteString(accentBold.Render("Matrix"))
-	b.WriteString("  " + hintStyle.Render(fmt.Sprintf("%d shown, %d waiting on you", len(rows), waiting)))
+	b.WriteString("  " + cyanStyle.Render(fmt.Sprintf("%d shown, %d waiting on you", len(rows), waiting)))
 	b.WriteString("\n\n")
 	switch {
 	case len(rows) == 0 && idle == 0:
-		b.WriteString(dimStyle.Render("Nothing in flight."))
+		b.WriteString(textStyle.Render("Nothing in flight."))
 		b.WriteString("\n")
 	case len(rows) == 0:
-		b.WriteString(dimStyle.Render(fmt.Sprintf("No agents running. a: show the %d cards in flight without one.", idle)))
+		b.WriteString(textStyle.Render(fmt.Sprintf("No agents running. a: show the %d cards in flight without one.", idle)))
 		b.WriteString("\n")
 	}
 	for _, r := range rows {
 		agent := agentMarkup(r.agent)
 		if agent == "" {
-			agent = dimStyle.Render("no agent")
+			agent = textStyle.Render("no agent")
 		}
-		cycle := dimStyle.Render("-")
+		cycle := textStyle.Render("-")
 		if c := m.cycleText(r.card.ID); c != "" {
 			cycle = textStyle.Render(c)
 		}
-		line := padCell(dimStyle.Render(fmt.Sprintf("#%d", r.card.ID)), 6) +
+		line := padCell(cyanStyle.Render(fmt.Sprintf("#%d", r.card.ID)), 6) +
 			padCell(boldStyle.Render(clipRunes(r.card.Title, 30)), 32) +
 			padCell(textStyle.Render(statusLabel[r.card.Status]), 12) +
 			padCell(agent, 12) +
@@ -164,6 +168,6 @@ func (mm *matrixModal) View(m *Model) string {
 		b.WriteString("\n")
 	}
 	b.WriteString("\n")
-	b.WriteString(hintStyle.Render("a: agents only / all in flight   Cycle: total spend across sessions   Esc/m: close"))
+	b.WriteString(cyanStyle.Render("a: agents only / all in flight   Cycle: total spend across sessions   Esc/m: close"))
 	return renderModal(modalBoxStyle, 112, b.String())
 }
