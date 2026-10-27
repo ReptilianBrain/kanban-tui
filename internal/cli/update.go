@@ -16,6 +16,7 @@ func newUpdateCmd(ctx *appCtx) *cobra.Command {
 		priority    string
 		due         string
 		label       string
+		jira        string
 		asJSON      bool
 	)
 
@@ -75,7 +76,20 @@ func newUpdateCmd(ctx *appCtx) *cobra.Command {
 				}
 			}
 
-			if err := ctx.db.UpdateCard(cardID, newTitle, newDesc, newPriority, newDue, newLabel); err != nil {
+			newJira := card.JiraKey
+			if cmd.Flags().Changed("jira") {
+				key, err := db.NormalizeJiraKey(jira)
+				if err != nil {
+					return fail(cmd, "%s", err.Error())
+				}
+				if key == "" {
+					newJira = nil
+				} else {
+					newJira = &key
+				}
+			}
+
+			if err := ctx.db.UpdateCard(cardID, newTitle, newDesc, newPriority, newDue, newLabel, newJira); err != nil {
 				return fail(cmd, "%s", err.Error())
 			}
 
@@ -102,6 +116,7 @@ func newUpdateCmd(ctx *appCtx) *cobra.Command {
 	cmd.Flags().VarP(&choiceValue{value: &priority, allowed: priorities}, "priority", "p", "")
 	cmd.Flags().StringVar(&due, "due", "", `Due date YYYY-MM-DD, or "" to clear.`)
 	cmd.Flags().StringVar(&label, "label", "", `Label name, or "" to clear.`)
+	cmd.Flags().StringVar(&jira, "jira", "", `Jira ticket key (ABC-123) or browse URL, or "" to clear.`)
 	cmd.Flags().BoolVar(&asJSON, "json", false, "Print the resulting card as JSON.")
 
 	return cmd

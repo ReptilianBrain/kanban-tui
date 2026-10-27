@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+
+	"github.com/ReptilianBrain/kanban-tui/internal/db"
 )
 
 func newAddCmd(ctx *appCtx) *cobra.Command {
@@ -13,6 +15,7 @@ func newAddCmd(ctx *appCtx) *cobra.Command {
 		priority    string
 		due         string
 		label       string
+		jira        string
 		asJSON      bool
 	)
 
@@ -25,6 +28,10 @@ func newAddCmd(ctx *appCtx) *cobra.Command {
 
 			if err := validateDue(cmd, due); err != nil {
 				return err
+			}
+			jiraKey, err := db.NormalizeJiraKey(jira)
+			if err != nil {
+				return fail(cmd, "%s", err.Error())
 			}
 			if label != "" {
 				if err := ctx.db.EnsureLabel(label); err != nil {
@@ -42,14 +49,17 @@ func newAddCmd(ctx *appCtx) *cobra.Command {
 					dup.ID, dup.Title)
 			}
 
-			var dueDate, lbl *string
+			var dueDate, lbl, jiraPtr *string
 			if due != "" {
 				dueDate = &due
 			}
 			if label != "" {
 				lbl = &label
 			}
-			cardID, err := ctx.db.CreateCard(title, description, status, priority, dueDate, lbl)
+			if jiraKey != "" {
+				jiraPtr = &jiraKey
+			}
+			cardID, err := ctx.db.CreateCard(title, description, status, priority, dueDate, lbl, jiraPtr)
 			if err != nil {
 				return fail(cmd, "%s", err.Error())
 			}
@@ -66,6 +76,7 @@ func newAddCmd(ctx *appCtx) *cobra.Command {
 	cmd.Flags().VarP(newChoiceFlag(&priority, priorities, "medium"), "priority", "p", "")
 	cmd.Flags().StringVar(&due, "due", "", "Due date (YYYY-MM-DD).")
 	cmd.Flags().StringVar(&label, "label", "", "Label name (created if it's new).")
+	cmd.Flags().StringVar(&jira, "jira", "", "Jira ticket key (ABC-123) or browse URL.")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "Print the resulting card as JSON.")
 
 	return cmd

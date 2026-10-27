@@ -15,7 +15,7 @@ make build        # go build -o kanban ./cmd/kanban
 ```
 
 ```bash
-kanban add "Fix login bug" -p high --label backend --due 2026-07-01
+kanban add "Fix login bug" -p high --label backend --due 2026-07-01 --jira PRJ-123
 kanban list --json
 kanban move 12 in_review
 kanban next       # suggest the best card to pick up

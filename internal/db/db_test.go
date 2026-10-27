@@ -26,7 +26,7 @@ func TestMigrationIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first InitDB: %v", err)
 	}
-	id, err := d.CreateCard("a card", "", "todo", "medium", nil, nil)
+	id, err := d.CreateCard("a card", "", "todo", "medium", nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCard: %v", err)
 	}
@@ -65,7 +65,7 @@ func TestMigrationIsIdempotent(t *testing.T) {
 // The retired "planned" status is folded into "todo" on init.
 func TestPlannedStatusFoldedToTodo(t *testing.T) {
 	d := openTestDB(t)
-	id, err := d.CreateCard("legacy planned card", "", "planned", "medium", nil, nil)
+	id, err := d.CreateCard("legacy planned card", "", "planned", "medium", nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCard: %v", err)
 	}
@@ -94,7 +94,7 @@ func TestPlannedStatusFoldedToTodo(t *testing.T) {
 // repeated move would reset the aging clock.
 func TestUpdateCardStatusNoOpWhenUnchanged(t *testing.T) {
 	d := openTestDB(t)
-	id, err := d.CreateCard("card", "desc", "todo", "medium", nil, nil)
+	id, err := d.CreateCard("card", "desc", "todo", "medium", nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCard: %v", err)
 	}
@@ -128,7 +128,7 @@ func TestUpdateCardStatusNoOpWhenUnchanged(t *testing.T) {
 
 func TestUpdateCardStatusMovesAndStampsAging(t *testing.T) {
 	d := openTestDB(t)
-	id, err := d.CreateCard("card", "desc", "todo", "medium", nil, nil)
+	id, err := d.CreateCard("card", "desc", "todo", "medium", nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCard: %v", err)
 	}
@@ -165,7 +165,7 @@ func TestGetRevisionExcludesNotes(t *testing.T) {
 		t.Fatalf("GetRevision: %v", err)
 	}
 
-	id, err := d.CreateCard("card", "desc", "todo", "medium", nil, nil)
+	id, err := d.CreateCard("card", "desc", "todo", "medium", nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCard: %v", err)
 	}
@@ -231,7 +231,7 @@ func TestLabelCRUDAndProtection(t *testing.T) {
 		t.Fatalf("CreateLabel: %v", err)
 	}
 
-	cardID, err := d.CreateCard("card", "", "todo", "medium", nil, strPtr("backend"))
+	cardID, err := d.CreateCard("card", "", "todo", "medium", nil, strPtr("backend"), nil)
 	if err != nil {
 		t.Fatalf("CreateCard: %v", err)
 	}
@@ -321,11 +321,11 @@ func TestNoteCRUD(t *testing.T) {
 
 func TestCreateCardPositionSequencing(t *testing.T) {
 	d := openTestDB(t)
-	id1, err := d.CreateCard("first", "", "todo", "medium", nil, nil)
+	id1, err := d.CreateCard("first", "", "todo", "medium", nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCard: %v", err)
 	}
-	id2, err := d.CreateCard("second", "", "todo", "medium", nil, nil)
+	id2, err := d.CreateCard("second", "", "todo", "medium", nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCard: %v", err)
 	}
@@ -345,9 +345,9 @@ func TestCreateCardPositionSequencing(t *testing.T) {
 
 func TestMoveCardPosition(t *testing.T) {
 	d := openTestDB(t)
-	id1, _ := d.CreateCard("first", "", "todo", "medium", nil, nil)
-	id2, _ := d.CreateCard("second", "", "todo", "medium", nil, nil)
-	id3, _ := d.CreateCard("third", "", "todo", "medium", nil, nil)
+	id1, _ := d.CreateCard("first", "", "todo", "medium", nil, nil, nil)
+	id2, _ := d.CreateCard("second", "", "todo", "medium", nil, nil, nil)
+	id3, _ := d.CreateCard("third", "", "todo", "medium", nil, nil, nil)
 
 	// Middle card moves ahead of the first.
 	moved, err := d.MoveCardPosition(id2, -1)
@@ -408,7 +408,7 @@ func TestMigrateDropsLegacyGitlabColumns(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB: %v", err)
 	}
-	id, err := d.CreateCard("keep me", "desc", "ongoing", "high", nil, nil)
+	id, err := d.CreateCard("keep me", "desc", "ongoing", "high", nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCard: %v", err)
 	}
@@ -446,5 +446,53 @@ func TestMigrateDropsLegacyGitlabColumns(t *testing.T) {
 	}
 	if card.Title != "keep me" || card.Status != "ongoing" || card.Priority != "high" {
 		t.Errorf("card data changed by migration: %+v", card)
+	}
+}
+
+func TestNormalizeJiraKey(t *testing.T) {
+	good := map[string]string{
+		"":                                     "",
+		"  ":                                   "",
+		"prj-123":                              "PRJ-123",
+		" PRJ-1688 ":                           "PRJ-1688",
+		"https://jira.example.com/browse/A1-9": "A1-9",
+		"https://jira.example.com/browse/PRJ-5?focusedId=1": "PRJ-5",
+	}
+	for in, want := range good {
+		got, err := NormalizeJiraKey(in)
+		if err != nil || got != want {
+			t.Errorf("NormalizeJiraKey(%q) = %q, %v; want %q", in, got, err, want)
+		}
+	}
+	for _, bad := range []string{"PRJ", "123", "PRJ-", "PRJ-x", "two words-1", "-1"} {
+		if _, err := NormalizeJiraKey(bad); err == nil {
+			t.Errorf("NormalizeJiraKey(%q): expected an error", bad)
+		}
+	}
+}
+
+func TestJiraKeyRoundTripAndSearch(t *testing.T) {
+	d := openTestDB(t)
+	id, err := d.CreateCard("linked", "body", "todo", "medium", nil, nil, strPtr("PRJ-42"))
+	if err != nil {
+		t.Fatalf("CreateCard: %v", err)
+	}
+	card, _ := d.GetCard(id)
+	if card.JiraKey == nil || *card.JiraKey != "PRJ-42" {
+		t.Fatalf("jira key after create: %v", card.JiraKey)
+	}
+	if !CardMatchesSearch(*card, "prj-42") || !CardMatchesSearch(*card, "PRJ-4") {
+		t.Error("search should match the Jira key")
+	}
+	if CardMatchesSearch(*card, "PRJ-99") {
+		t.Error("search matched a different key")
+	}
+
+	if err := d.UpdateCard(id, "linked", "body", "medium", nil, nil, nil); err != nil {
+		t.Fatalf("UpdateCard: %v", err)
+	}
+	card, _ = d.GetCard(id)
+	if card.JiraKey != nil {
+		t.Errorf("jira key after clearing: %v", *card.JiraKey)
 	}
 }

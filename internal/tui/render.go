@@ -169,6 +169,9 @@ func cardBlockLines(card db.Card, agent string) []string {
 	if p := agentMarkup(agent); p != "" {
 		parts = append(parts, p)
 	}
+	if card.JiraKey != nil && *card.JiraKey != "" {
+		parts = append(parts, accentStyle.Render(*card.JiraKey))
+	}
 	if p := dueMarkup(due); p != "" {
 		parts = append(parts, p)
 	}

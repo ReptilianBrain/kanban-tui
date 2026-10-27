@@ -45,6 +45,9 @@ func newShowCmd(ctx *appCtx) *cobra.Command {
 			if card.Label != nil && *card.Label != "" {
 				bits = append(bits, "#"+*card.Label)
 			}
+			if card.JiraKey != nil && *card.JiraKey != "" {
+				bits = append(bits, "jira:"+*card.JiraKey)
+			}
 			fmt.Fprintln(cmd.OutOrStdout(), strings.Join(bits, " "))
 			if card.Description != "" {
 				fmt.Fprintf(cmd.OutOrStdout(), "\n%s\n", card.Description)

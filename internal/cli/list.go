@@ -71,6 +71,9 @@ func newListCmd(ctx *appCtx) *cobra.Command {
 					if c.Label != nil && *c.Label != "" {
 						bits = append(bits, "#"+*c.Label)
 					}
+					if c.JiraKey != nil && *c.JiraKey != "" {
+						bits = append(bits, "jira:"+*c.JiraKey)
+					}
 					fmt.Fprintln(out, strings.Join(bits, " "))
 				}
 			}
@@ -80,7 +83,7 @@ func newListCmd(ctx *appCtx) *cobra.Command {
 
 	cmd.Flags().VarP(&choiceValue{value: &status, allowed: allStatuses}, "status", "s", "Only cards in this column.")
 	cmd.Flags().StringVar(&label, "label", "", "Only cards with this label.")
-	cmd.Flags().StringVar(&search, "search", "", "Fuzzy-search title & description.")
+	cmd.Flags().StringVar(&search, "search", "", "Fuzzy-search title, description & Jira key.")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "Print cards as a JSON array.")
 	return cmd
 }

@@ -80,6 +80,7 @@ var cardMigrationColumns = []struct {
 	{"labels", "ALTER TABLE cards ADD COLUMN labels TEXT NOT NULL DEFAULT ''"},
 	{"label", "ALTER TABLE cards ADD COLUMN label TEXT DEFAULT NULL"},
 	{"status_changed_at", "ALTER TABLE cards ADD COLUMN status_changed_at TEXT DEFAULT NULL"},
+	{"jira_key", "ALTER TABLE cards ADD COLUMN jira_key TEXT DEFAULT NULL"},
 }
 
 // legacyCardColumns are obsolete gitlab_* columns; migrate() drops them, and

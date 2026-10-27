@@ -20,6 +20,7 @@ type exportCard struct {
 	DueStatus   *string `json:"due_status"`
 	AgingStatus *string `json:"aging_status"`
 	Label       *string `json:"label"`
+	JiraKey     *string `json:"jira_key"`
 }
 
 type exportColumn struct {
@@ -102,6 +103,7 @@ func newExportCmd(ctx *appCtx) *cobra.Command {
 							DueStatus:   nilIfEmpty(dueStatus(c.DueDate)),
 							AgingStatus: nilIfEmpty(agingStatus(c.Status, c.StatusChangedAt, c.CreatedAt)),
 							Label:       c.Label,
+							JiraKey:     c.JiraKey,
 						})
 					}
 					columns = append(columns, exportColumn{
@@ -149,6 +151,9 @@ func newExportCmd(ctx *appCtx) *cobra.Command {
 					}
 					if c.Label != nil && *c.Label != "" {
 						meta = append(meta, fmt.Sprintf("[%s]", *c.Label))
+					}
+					if c.JiraKey != nil && *c.JiraKey != "" {
+						meta = append(meta, *c.JiraKey)
 					}
 					if len(meta) > 0 {
 						bits = append(bits, "— "+strings.Join(meta, " · "))

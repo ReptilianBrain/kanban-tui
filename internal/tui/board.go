@@ -282,12 +282,12 @@ func (m *Model) actionNotes() tea.Cmd {
 		}
 		status := statuses[m.col]
 
-		return m.pushModal(newCardModal(m.store, title, note.Text, "medium", "", labelPre, nil,
+		return m.pushModal(newCardModal(m.store, title, note.Text, "medium", "", labelPre, "", nil,
 			func(m *Model, result *cardFormResult) tea.Cmd {
 				if result == nil {
 					return nil // cancelled — keep the note
 				}
-				id, _ := m.store.CreateCard(result.Title, result.Description, status, result.Priority, result.DueDate, result.Label)
+				id, _ := m.store.CreateCard(result.Title, result.Description, status, result.Priority, result.DueDate, result.Label, result.JiraKey)
 				_ = m.store.DeleteNote(note.ID)
 				_ = m.loadData()
 				m.selectCard(status, id)
@@ -403,12 +403,12 @@ func (m *Model) actionNewCard() tea.Cmd {
 		lf := m.labelFilter
 		labelPre = &lf
 	}
-	return m.pushModal(newCardModal(m.store, "", "", "medium", "", labelPre, nil,
+	return m.pushModal(newCardModal(m.store, "", "", "medium", "", labelPre, "", nil,
 		func(m *Model, result *cardFormResult) tea.Cmd {
 			if result == nil {
 				return nil
 			}
-			id, _ := m.store.CreateCard(result.Title, result.Description, status, result.Priority, result.DueDate, result.Label)
+			id, _ := m.store.CreateCard(result.Title, result.Description, status, result.Priority, result.DueDate, result.Label, result.JiraKey)
 			_ = m.loadData()
 			m.selectCard(status, id)
 			return nil
@@ -425,12 +425,16 @@ func (m *Model) actionEditCard() tea.Cmd {
 	if card.DueDate != nil {
 		due = *card.DueDate
 	}
-	return m.pushModal(newCardModal(m.store, card.Title, card.Description, card.Priority, due, card.Label, &cardID,
+	jiraKey := ""
+	if card.JiraKey != nil {
+		jiraKey = *card.JiraKey
+	}
+	return m.pushModal(newCardModal(m.store, card.Title, card.Description, card.Priority, due, card.Label, jiraKey, &cardID,
 		func(m *Model, result *cardFormResult) tea.Cmd {
 			if result == nil {
 				return nil
 			}
-			_ = m.store.UpdateCard(cardID, result.Title, result.Description, result.Priority, result.DueDate, result.Label)
+			_ = m.store.UpdateCard(cardID, result.Title, result.Description, result.Priority, result.DueDate, result.Label, result.JiraKey)
 			m.refresh()
 			return nil
 		}))

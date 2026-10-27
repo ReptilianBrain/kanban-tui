@@ -17,6 +17,7 @@ type Card struct {
 	DueDate         *string `json:"due_date"`
 	Labels          string  `json:"labels"` // legacy free-form column, unused, always ""
 	Label           *string `json:"label"`
+	JiraKey         *string `json:"jira_key"`
 	StatusChangedAt *string `json:"status_changed_at"`
 	CreatedAt       string  `json:"created_at"`
 	UpdatedAt       string  `json:"updated_at"`
@@ -36,17 +37,17 @@ type Revision struct {
 // cardColumnsSQL is the column list for every card SELECT. Never SELECT *:
 // migrated databases have a different physical column order.
 const cardColumnsSQL = `id, title, description, status, position, priority, due_date, labels, label,
-	status_changed_at, created_at, updated_at`
+	jira_key, status_changed_at, created_at, updated_at`
 
 func scanCard(rs rowScanner) (Card, error) {
 	var (
-		c                               Card
-		dueDate, label, statusChangedAt sql.NullString
+		c                                        Card
+		dueDate, label, jiraKey, statusChangedAt sql.NullString
 	)
 	err := rs.Scan(
 		&c.ID, &c.Title, &c.Description, &c.Status, &c.Position, &c.Priority,
 		&dueDate, &c.Labels, &label,
-		&statusChangedAt,
+		&jiraKey, &statusChangedAt,
 		&c.CreatedAt, &c.UpdatedAt,
 	)
 	if err != nil {
@@ -54,6 +55,7 @@ func scanCard(rs rowScanner) (Card, error) {
 	}
 	c.DueDate = nullableToPtr(dueDate)
 	c.Label = nullableToPtr(label)
+	c.JiraKey = nullableToPtr(jiraKey)
 	c.StatusChangedAt = nullableToPtr(statusChangedAt)
 	return c, nil
 }
@@ -119,7 +121,7 @@ func (d *DB) nextPosition(status string) (int64, error) {
 
 // CreateCard inserts a card at the end of its column and returns its id. The
 // legacy labels column is always written as "".
-func (d *DB) CreateCard(title, description, status, priority string, dueDate, label *string) (int64, error) {
+func (d *DB) CreateCard(title, description, status, priority string, dueDate, label, jiraKey *string) (int64, error) {
 	pos, err := d.nextPosition(status)
 	if err != nil {
 		return 0, fmt.Errorf("db: creating card: %w", err)
@@ -127,10 +129,10 @@ func (d *DB) CreateCard(title, description, status, priority string, dueDate, la
 	now := nowStamp()
 	res, err := d.conn.Exec(
 		`INSERT INTO cards
-			(title, description, status, position, priority, due_date, label, labels,
+			(title, description, status, position, priority, due_date, label, jira_key, labels,
 			 status_changed_at, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		title, description, status, pos, priority, nullableArg(dueDate), nullableArg(label), "",
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		title, description, status, pos, priority, nullableArg(dueDate), nullableArg(label), nullableArg(jiraKey), "",
 		now, now, now,
 	)
 	if err != nil {
@@ -141,11 +143,11 @@ func (d *DB) CreateCard(title, description, status, priority string, dueDate, la
 
 // UpdateCard edits content fields and bumps updated_at; status, position and
 // status_changed_at are untouched.
-func (d *DB) UpdateCard(id int64, title, description, priority string, dueDate, label *string) error {
+func (d *DB) UpdateCard(id int64, title, description, priority string, dueDate, label, jiraKey *string) error {
 	now := nowStamp()
 	_, err := d.conn.Exec(
-		`UPDATE cards SET title=?, description=?, priority=?, due_date=?, label=?, updated_at=? WHERE id=?`,
-		title, description, priority, nullableArg(dueDate), nullableArg(label), now, id,
+		`UPDATE cards SET title=?, description=?, priority=?, due_date=?, label=?, jira_key=?, updated_at=? WHERE id=?`,
+		title, description, priority, nullableArg(dueDate), nullableArg(label), nullableArg(jiraKey), now, id,
 	)
 	if err != nil {
 		return fmt.Errorf("db: updating card %d: %w", id, err)

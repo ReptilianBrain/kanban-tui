@@ -17,6 +17,7 @@ type cardFormResult struct {
 	Priority    string
 	DueDate     *string
 	Label       *string
+	JiraKey     *string
 }
 
 const (
@@ -24,6 +25,7 @@ const (
 	cardFocusPriority
 	cardFocusDue
 	cardFocusLabel
+	cardFocusJira
 	cardFocusDesc
 	cardFocusCount
 )
@@ -36,6 +38,7 @@ type cardModal struct {
 
 	title textinput.Model
 	due   textinput.Model
+	jira  textinput.Model
 	desc  textarea.Model
 
 	labels      []db.Label
@@ -50,7 +53,7 @@ type cardModal struct {
 
 // newCardModal builds the form. A non-empty label pre-selects it (label-filter
 // pre-fill and note promotion); a non-nil cardID means edit rather than create.
-func newCardModal(store *db.DB, title, description, priority, dueDate string, label *string, cardID *int64, done func(m *Model, result *cardFormResult) tea.Cmd) *cardModal {
+func newCardModal(store *db.DB, title, description, priority, dueDate string, label *string, jiraKey string, cardID *int64, done func(m *Model, result *cardFormResult) tea.Cmd) *cardModal {
 	labels, _ := store.GetLabels()
 
 	ti := textinput.New()
@@ -62,6 +65,11 @@ func newCardModal(store *db.DB, title, description, priority, dueDate string, la
 	di.Placeholder = "2026-05-26"
 	styleInput(&di, colorSurface)
 	di.SetValue(dueDate)
+
+	ji := textinput.New()
+	ji.Placeholder = "ABC-123"
+	styleInput(&ji, colorSurface)
+	ji.SetValue(jiraKey)
 
 	ta := textarea.New()
 	styleTextarea(&ta)
@@ -93,6 +101,7 @@ func newCardModal(store *db.DB, title, description, priority, dueDate string, la
 		cardID:      cardID,
 		title:       ti,
 		due:         di,
+		jira:        ji,
 		desc:        ta,
 		labels:      labels,
 		priorityIdx: priorityIdx,
@@ -110,6 +119,7 @@ func (c *cardModal) Init(m *Model) tea.Cmd {
 func (c *cardModal) setFocus(f int) tea.Cmd {
 	c.title.Blur()
 	c.due.Blur()
+	c.jira.Blur()
 	c.desc.Blur()
 	c.focus = f
 	switch f {
@@ -117,6 +127,8 @@ func (c *cardModal) setFocus(f int) tea.Cmd {
 		return c.title.Focus()
 	case cardFocusDue:
 		return c.due.Focus()
+	case cardFocusJira:
+		return c.jira.Focus()
 	case cardFocusDesc:
 		return c.desc.Focus()
 	}
@@ -144,6 +156,14 @@ func (c *cardModal) save(m *Model) tea.Cmd {
 		dueDate = &dueRaw
 	}
 
+	var jiraKey *string
+	if key, err := db.NormalizeJiraKey(c.jira.Value()); err != nil {
+		c.errMsg = "Jira key must look like ABC-123"
+		return c.setFocus(cardFocusJira)
+	} else if key != "" {
+		jiraKey = &key
+	}
+
 	var label *string
 	if c.labelIdx > 0 && c.labelIdx-1 < len(c.labels) {
 		name := c.labels[c.labelIdx-1].Name
@@ -156,6 +176,7 @@ func (c *cardModal) save(m *Model) tea.Cmd {
 		Priority:    priorityOptions[c.priorityIdx],
 		DueDate:     dueDate,
 		Label:       label,
+		JiraKey:     jiraKey,
 	}
 	m.popModal()
 	return c.done(m, result)
@@ -171,6 +192,8 @@ func (c *cardModal) Update(msg tea.Msg, m *Model) tea.Cmd {
 			c.title, cmd = c.title.Update(msg)
 		case cardFocusDue:
 			c.due, cmd = c.due.Update(msg)
+		case cardFocusJira:
+			c.jira, cmd = c.jira.Update(msg)
 		case cardFocusDesc:
 			c.desc, cmd = c.desc.Update(msg)
 		}
@@ -197,6 +220,10 @@ func (c *cardModal) Update(msg tea.Msg, m *Model) tea.Cmd {
 	case cardFocusDue:
 		var cmd tea.Cmd
 		c.due, cmd = c.due.Update(keyMsg)
+		return cmd
+	case cardFocusJira:
+		var cmd tea.Cmd
+		c.jira, cmd = c.jira.Update(keyMsg)
 		return cmd
 	case cardFocusDesc:
 		var cmd tea.Cmd
@@ -258,6 +285,9 @@ func (c *cardModal) View(m *Model) string {
 
 	labelVal := pickerValue(c.labelName(), c.focus == cardFocusLabel)
 	b.WriteString(fieldLine("Label  (←/→ to change)", c.focus == cardFocusLabel, labelVal))
+	b.WriteString("\n\n")
+
+	b.WriteString(fieldLine("Jira ticket  (ABC-123, optional)", c.focus == cardFocusJira, c.jira.View()))
 	b.WriteString("\n\n")
 
 	b.WriteString(fieldLine("Description", c.focus == cardFocusDesc, c.desc.View()))

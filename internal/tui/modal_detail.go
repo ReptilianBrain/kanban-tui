@@ -85,8 +85,15 @@ func (d *cardDetailModal) View(m *Model) string {
 	b.WriteString("\n")
 
 	due := dueMarkup(c.DueDate)
+	jira := ""
+	if c.JiraKey != nil && *c.JiraKey != "" {
+		jira = accentStyle.Render(*c.JiraKey)
+	}
 	lbl := labelMarkup(c.Label)
 	meta := []string{}
+	if jira != "" {
+		meta = append(meta, jira)
+	}
 	if due != "" {
 		meta = append(meta, due)
 	}

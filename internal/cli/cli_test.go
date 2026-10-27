@@ -152,3 +152,42 @@ func TestExecuteNoteLifecycle(t *testing.T) {
 		t.Fatalf("note-delete missing: exit code %d, want 1", code)
 	}
 }
+
+func TestExecuteJiraFlag(t *testing.T) {
+	path := testDBPath(t)
+	if code := Execute([]string{"add", "Linked", "--jira", "prj-12"}); code != 0 {
+		t.Fatalf("add --jira: exit code %d, want 0", code)
+	}
+	if code := Execute([]string{"add", "Bad", "--jira", "nope"}); code != 1 {
+		t.Fatalf("add with a bad key: exit code %d, want 1", code)
+	}
+
+	jiraOf := func() *string {
+		t.Helper()
+		d, err := db.InitDB(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer d.Close()
+		c, err := d.GetCard(1)
+		if err != nil || c == nil {
+			t.Fatalf("GetCard: %v, %v", c, err)
+		}
+		return c.JiraKey
+	}
+	if k := jiraOf(); k == nil || *k != "PRJ-12" {
+		t.Fatalf("jira key after add = %v, want PRJ-12", k)
+	}
+	if code := Execute([]string{"update", "1", "-t", "Renamed"}); code != 0 {
+		t.Fatalf("update: exit code %d", code)
+	}
+	if k := jiraOf(); k == nil || *k != "PRJ-12" {
+		t.Fatalf("an update that omits --jira must keep it, got %v", k)
+	}
+	if code := Execute([]string{"update", "1", "--jira", ""}); code != 0 {
+		t.Fatalf("update --jira '': exit code %d", code)
+	}
+	if k := jiraOf(); k != nil {
+		t.Fatalf("jira key after clearing = %v, want nil", *k)
+	}
+}

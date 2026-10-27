@@ -11,7 +11,7 @@ var t0 = time.Date(2026, 10, 26, 12, 0, 0, 0, time.UTC)
 
 func addCard(t *testing.T, m *Model, status string) int64 {
 	t.Helper()
-	id, err := m.store.CreateCard("watched", "", status, "medium", nil, nil)
+	id, err := m.store.CreateCard("watched", "", status, "medium", nil, nil, nil)
 	if err != nil {
 		t.Fatalf("CreateCard: %v", err)
 	}

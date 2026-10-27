@@ -107,12 +107,15 @@ func FuzzyScore(query, text string) (int, bool) {
 	return score, true
 }
 
-// CardMatchesSearch fuzzy-matches query against title and description. A
+// CardMatchesSearch fuzzy-matches query against title, description and Jira key. A
 // query that is a substring of the card's id also matches; ids are checked by
 // plain substring because a short numeric query would otherwise
 // subsequence-match unrelated ids.
 func CardMatchesSearch(card Card, query string) bool {
 	haystack := card.Title + " " + card.Description
+	if card.JiraKey != nil {
+		haystack += " " + *card.JiraKey
+	}
 	if _, matched := FuzzyScore(query, haystack); matched {
 		return true
 	}

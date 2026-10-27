@@ -64,7 +64,7 @@ func testStore(t *testing.T) *db.DB {
 			l := c.label
 			label = &l
 		}
-		if _, err := store.CreateCard(c.title, c.desc, c.status, c.priority, nil, label); err != nil {
+		if _, err := store.CreateCard(c.title, c.desc, c.status, c.priority, nil, label, nil); err != nil {
 			t.Fatalf("seeding card %q: %v", c.title, err)
 		}
 	}
@@ -735,5 +735,39 @@ func TestCreateCardSelectsNewCard(t *testing.T) {
 	send(m, "ctrl+s")
 	if c := m.currentCard(); c == nil || c.Title != "Selected On Create" {
 		t.Fatalf("expected the new card to be selected, got %+v", c)
+	}
+}
+
+func TestJiraKeyOnCardSearchAndForm(t *testing.T) {
+	m := newTestModel(t)
+	card := m.data["todo"][0]
+	k := "PRJ-77"
+	if err := m.store.UpdateCard(card.ID, card.Title, card.Description, card.Priority, card.DueDate, card.Label, &k); err != nil {
+		t.Fatal(err)
+	}
+	m.refresh()
+
+	m.searchQuery = "prj-77"
+	m.clampRow()
+	vis := m.visibleCards("todo")
+	if len(vis) != 1 || vis[0].ID != card.ID {
+		t.Fatalf("searching the Jira key: got %d cards, want just #%d", len(vis), card.ID)
+	}
+	if !strings.Contains(strings.Join(cardBlockLines(vis[0], ""), "\n"), "PRJ-77") {
+		t.Error("the board card should show the Jira key")
+	}
+	m.searchQuery = ""
+
+	// The form pre-fills the key, saves it, and rejects a malformed one.
+	cm := newCardModal(m.store, card.Title, card.Description, card.Priority, "", card.Label, "PRJ-77", &card.ID,
+		func(m *Model, r *cardFormResult) tea.Cmd { return nil })
+	m.pushModal(cm)
+	if cm.jira.Value() != "PRJ-77" {
+		t.Fatalf("form jira field = %q, want PRJ-77", cm.jira.Value())
+	}
+	cm.jira.SetValue("bad key")
+	cm.save(m)
+	if cm.errMsg == "" || cm.focus != cardFocusJira {
+		t.Errorf("a bad key should block save and focus the field (err=%q focus=%d)", cm.errMsg, cm.focus)
 	}
 }
