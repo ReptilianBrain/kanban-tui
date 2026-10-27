@@ -40,6 +40,8 @@ func (m *Model) handleBoardKey(msg tea.KeyMsg) tea.Cmd {
 		return m.actionMoveCardDown()
 	case "f":
 		return m.actionFilter()
+	case "m":
+		return m.actionMatrix()
 	case "/":
 		return m.actionSearch()
 	case "esc":

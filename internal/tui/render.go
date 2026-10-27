@@ -137,9 +137,26 @@ func itoa(n int) string {
 	return string(b)
 }
 
+// agentMarkup shows what the card's herdr agent is doing; unknown states and
+// cards without an agent render nothing.
+func agentMarkup(state string) string {
+	switch state {
+	case "working":
+		return accentStyle.Render("◉ working")
+	case "blocked":
+		return warnBoldStyle.Render("▲ waiting")
+	case "idle":
+		return dimStyle.Render("◌ idle")
+	case "done":
+		return successStyle.Render("✓ done")
+	}
+	return ""
+}
+
 // cardBlockLines returns a card's content lines, unbordered (the caller adds
 // border and background): "#id badge title", then an optional meta line.
-func cardBlockLines(card db.Card) []string {
+// agent is the card's herdr agent status, or "" when it has none.
+func cardBlockLines(card db.Card, agent string) []string {
 	idPrefix := dimStyle.Render("#" + itoa64(card.ID))
 	badge := priorityBadge(card.Priority)
 	title := card.Title
@@ -149,6 +166,9 @@ func cardBlockLines(card db.Card) []string {
 	var due *string
 	due = card.DueDate
 	parts := []string{}
+	if p := agentMarkup(agent); p != "" {
+		parts = append(parts, p)
+	}
 	if p := dueMarkup(due); p != "" {
 		parts = append(parts, p)
 	}

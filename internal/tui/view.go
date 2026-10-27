@@ -10,7 +10,7 @@ import (
 const searchHint = "type to filter  Enter:keep  Esc:clear  ↑↓:select  ←→:column"
 
 const footerHint = "n:New  e:Edit  d:Delete  Enter:View  ←→/hl:Col  ↑↓/kj:Row  " +
-	"Shift←→/[]:Move  f:Filter  /:Search  t:Labels  o:Notes  c:Toggle Ends  H:Herdr  r:Refresh  q:Quit"
+	"Shift←→/[]:Move  f:Filter  /:Search  t:Labels  o:Notes  c:Toggle Ends  H:Herdr  m:Matrix  r:Refresh  q:Quit"
 
 // View renders the board (title bar, columns, footer hint, toast line). An
 // open modal replaces the board and is centered on the frame rather than
@@ -190,7 +190,7 @@ func (m *Model) renderColumn(status string, colWidth, bodyHeight int) string {
 	blocks := make([]string, len(visible))
 	heights := make([]int, len(visible))
 	for i, c := range visible {
-		content := strings.Join(cardBlockLines(c), "\n")
+		content := strings.Join(cardBlockLines(c, m.agents[c.ID]), "\n")
 		st := cardStyle
 		if active && i == m.row {
 			st = cardSelectedStyle

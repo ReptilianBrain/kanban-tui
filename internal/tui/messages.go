@@ -1,9 +1,13 @@
 package tui
 
 import (
+	"context"
+	"errors"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/ReptilianBrain/kanban-tui/internal/herdrsync"
 )
 
 // tickMsg drives the ~1s DB-change poll. Bubble Tea's Tick is one-shot, so
@@ -12,6 +16,36 @@ type tickMsg struct{}
 
 func tickCmd() tea.Cmd {
 	return tea.Tick(time.Second, func(time.Time) tea.Msg { return tickMsg{} })
+}
+
+// agentPollEvery is how often herdr is asked for agent states. It is a
+// subprocess per poll, so it is slower than the 1s DB poll.
+const agentPollEvery = 3 * time.Second
+
+// agentsMsg carries one poll of `herdr agent list`, reduced to a status per
+// card. disabled means herdr is not installed, so polling stops for good; any
+// other error keeps the previous states and tries again next round.
+type agentsMsg struct {
+	states   map[int64]string
+	err      error
+	disabled bool
+}
+
+// pollAgentsCmd waits, then asks herdr for the agent list. Like tickCmd it is
+// one-shot: the agentsMsg handler schedules the next poll.
+func pollAgentsCmd(after time.Duration) tea.Cmd {
+	return func() tea.Msg {
+		time.Sleep(after)
+		agents, err := herdrsync.ListAgents(context.Background())
+		var cfg *herdrsync.ConfigError
+		if errors.As(err, &cfg) {
+			return agentsMsg{disabled: true}
+		}
+		if err != nil {
+			return agentsMsg{err: err}
+		}
+		return agentsMsg{states: herdrsync.CardStates(agents)}
+	}
 }
 
 // toastClearMsg clears the toast banner, but only if seq still matches the

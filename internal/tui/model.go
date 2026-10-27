@@ -5,25 +5,30 @@ package tui
 import (
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/ReptilianBrain/kanban-tui/internal/cost"
 	"github.com/ReptilianBrain/kanban-tui/internal/db"
 )
+
+// cycleText renders a card's total spend (its Cycle), or "" with no data.
+func (m *Model) cycleText(id int64) string {
+	if total, ok := cost.CardTotal(m.costDir, id); ok {
+		return fmt.Sprintf("$%.2f", total)
+	}
+	return ""
+}
 
 // statuses is the fixed column order.
 var statuses = []string{"todo", "ongoing", "blocked", "in_review", "completed"}
 
-// statusLabel maps each stored status value to its column label; the value
-// for In Progress is "ongoing" everywhere outside the display.
-var statusLabel = map[string]string{
-	"todo":      "Backlog",
-	"ongoing":   "In Progress",
-	"blocked":   "Blocked",
-	"in_review": "In Review",
-	"completed": "Completed",
-}
+// statusLabel maps each stored status value to its column label under the
+// active skin (see lexicon.go); the stored value for In Progress is "ongoing"
+// everywhere outside the display.
+var statusLabel = activeSkin().status
 
 var priorityOptions = []string{"low", "medium", "high", "critical"}
 
@@ -65,6 +70,18 @@ type Model struct {
 
 	herdrBusy bool
 
+	// agents maps card id to its herdr agent status (see agentsMsg); empty
+	// until the first poll answers or when herdr is not installed.
+	agents map[int64]string
+
+	// watch moves cards between In Progress and Blocked from agent state;
+	// clock is a seam so tests can fast-forward the waiting window.
+	watch *watcher
+	clock func() time.Time
+
+	// costDir holds the per-card spend files (see internal/cost).
+	costDir string
+
 	quitting bool
 }
 
@@ -80,6 +97,9 @@ func newModel(store *db.DB) *Model {
 		showEnds:    true,
 		searchInput: ti,
 		data:        map[string][]db.Card{},
+		watch:       newWatcher(),
+		clock:       time.Now,
+		costDir:     cost.Dir(),
 	}
 }
 
@@ -101,9 +121,10 @@ func Run() error {
 	return err
 }
 
-// Init starts the DB-change poll; Run loads the board before the program starts.
+// Init starts the DB-change poll and the herdr agent poll; Run loads the
+// board before the program starts.
 func (m *Model) Init() tea.Cmd {
-	return tickCmd()
+	return tea.Batch(tickCmd(), pollAgentsCmd(0))
 }
 
 // loadData reloads every card, buckets it by status and records the current
@@ -247,6 +268,18 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case herdrOpenDoneMsg:
 		return m, m.handleHerdrOpenDone(msg)
 
+	case agentsMsg:
+		if msg.disabled {
+			m.agents = nil
+			return m, nil
+		}
+		var moved tea.Cmd
+		if msg.err == nil {
+			m.agents = msg.states
+			moved = m.reconcileAgents(msg.states)
+		}
+		return m, tea.Batch(moved, pollAgentsCmd(agentPollEvery))
+
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
 			m.quitting = true
@@ -281,7 +314,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // Tea's Tick is one-shot. The cursor stays on the same card id across a reload.
 func (m *Model) handleTick() tea.Cmd {
 	next := tickCmd()
-	if len(m.modalStack) > 0 {
+	if m.blockingModal() {
 		return next
 	}
 	rev, err := m.store.GetRevision()
