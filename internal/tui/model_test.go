@@ -82,6 +82,7 @@ func newTestModel(t *testing.T) *Model {
 	t.Helper()
 	store := testStore(t)
 	m := newModel(store)
+	m.costDir = t.TempDir() // never read the real ~/.kanbantui/cost
 	if err := m.loadData(); err != nil {
 		t.Fatalf("loadData: %v", err)
 	}

@@ -75,6 +75,9 @@ func (d *cardDetailModal) View(m *Model) string {
 		prio = c.Priority
 	}
 	b.WriteString(textStyle.Render("Priority: " + prio))
+	if cycle := m.cycleText(c.ID); cycle != "" {
+		b.WriteString("   " + textStyle.Render("Cycle: "+cycle))
+	}
 	b.WriteString("\n\n")
 	b.WriteString(boldStyle.Render("Description"))
 	b.WriteString("\n")
