@@ -17,8 +17,7 @@ import (
 // unreadable in a real terminal.
 //
 // matrixModal is the live monitor: the cards that have a herdr agent, with
-// the agent's state and, for a waiting agent, how long until the watcher
-// blocks the card. "a" widens it to every card in flight (In Progress or
+// the agent's state and, for a waiting agent, how long it has waited. "a" widens it to every card in flight (In Progress or
 // Blocked), since a board accumulates stale cards that have no agent. It is
 // read-only, so unlike other modals it does not pause the DB poll or the
 // watcher; see blockingModal.
@@ -110,17 +109,10 @@ func formatWait(d time.Duration) string {
 	return fmt.Sprintf("%d:%02d", s/60, s%60)
 }
 
-// watchNote says what the watcher is doing about a row, if anything.
+// watchNote says how long a row's agent has been waiting on you, if it is.
 func (m *Model) watchNote(r matrixRow) string {
 	if since, ok := m.watch.waitingSince[r.card.ID]; ok && r.card.Status == "ongoing" {
-		left := flatlineAfter - m.clock().Sub(since)
-		if left <= 0 {
-			return warnStyle.Render("Flatline next poll")
-		}
-		return warnStyle.Render(fmt.Sprintf("Flatline in %s (waited %s)", formatWait(left), formatWait(m.clock().Sub(since))))
-	}
-	if m.watch.autoBlocked[r.card.ID] {
-		return textStyle.Render("auto-blocked, returns when the agent resumes")
+		return warnStyle.Render("waiting " + formatWait(m.clock().Sub(since)))
 	}
 	return ""
 }

@@ -151,6 +151,17 @@ func (m *Model) renderColumns(bodyHeight int) string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, rendered...)
 }
 
+// waitingAgents counts In Progress cards whose agent is waiting on the user.
+func (m *Model) waitingAgents() int {
+	n := 0
+	for _, c := range m.data["ongoing"] {
+		if m.agents[c.ID] == "blocked" {
+			n++
+		}
+	}
+	return n
+}
+
 func (m *Model) renderColumn(status string, colWidth, bodyHeight int) string {
 	active := statuses[m.col] == status
 	visible := m.visibleCards(status)
@@ -172,6 +183,11 @@ func (m *Model) renderColumn(status string, colWidth, bodyHeight int) string {
 		}
 	}
 	headerText := fmt.Sprintf("%s  (%s)", statusLabel[status], countStr)
+	if status == "ongoing" {
+		if n := m.waitingAgents(); n > 0 {
+			headerText += fmt.Sprintf("  ▲%d", n)
+		}
+	}
 
 	overloaded := status != "todo" && status != "completed" && total > 5
 	if limit > 0 {

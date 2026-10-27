@@ -37,7 +37,7 @@ func TestMatrix_OpensClosesAndListsInFlightCards(t *testing.T) {
 	}
 }
 
-func TestMatrix_ShowsTheFlatlineCountdown(t *testing.T) {
+func TestMatrix_ShowsHowLongTheAgentHasWaited(t *testing.T) {
 	m := newTestModel(t)
 	id := addCard(t, m, "ongoing")
 	m.agents = map[int64]string{id: "blocked"}
@@ -46,8 +46,8 @@ func TestMatrix_ShowsTheFlatlineCountdown(t *testing.T) {
 
 	send(m, "m")
 	view := m.topModal().View(m)
-	if !strings.Contains(view, "Flatline in 1:00") {
-		t.Errorf("want a 1:00 countdown after 30s of waiting, got:\n%s", view)
+	if !strings.Contains(view, "waiting 0:30") {
+		t.Errorf("want 0:30 after 30s of waiting, got:\n%s", view)
 	}
 }
 
@@ -61,9 +61,9 @@ func TestMatrix_DoesNotFreezeTheWatcherButOtherModalsDo(t *testing.T) {
 	if m.blockingModal() {
 		t.Fatal("the Matrix must not block the watcher")
 	}
-	reconcileAt(m, flatlineAfter+time.Second, waiting)
-	if got := statusOf(t, m, id); got != "blocked" {
-		t.Errorf("watcher should run under the Matrix, status = %q", got)
+	reconcileAt(m, waitAfter+time.Second, waiting)
+	if !m.watch.notified[id] {
+		t.Error("watcher should run under the Matrix and notify")
 	}
 
 	m.modalStack = []modal{newDeleteConfirmModal("x", nil)}

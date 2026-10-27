@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 )
@@ -34,25 +36,46 @@ func statusOf(t *testing.T, m *Model, id int64) string {
 	return card.Status
 }
 
-func TestWatcher_FlatlinesAfterWaitingWindowAndReturns(t *testing.T) {
+func TestWatcher_ToastsOnceAfterTheWaitingWindowAndNeverMoves(t *testing.T) {
 	m := newTestModel(t)
 	id := addCard(t, m, "ongoing")
 	waiting := map[int64]string{id: "blocked"}
 
 	reconcileAt(m, 0, waiting)
-	reconcileAt(m, flatlineAfter-time.Second, waiting)
-	if got := statusOf(t, m, id); got != "ongoing" {
-		t.Fatalf("inside the window status = %q, want ongoing", got)
+	reconcileAt(m, waitAfter-time.Second, waiting)
+	if m.toastMsg != "" {
+		t.Fatalf("toast inside the window: %q", m.toastMsg)
 	}
 
-	reconcileAt(m, flatlineAfter+time.Second, waiting)
-	if got := statusOf(t, m, id); got != "blocked" {
-		t.Fatalf("after the window status = %q, want blocked", got)
+	reconcileAt(m, waitAfter+time.Second, waiting)
+	if !strings.Contains(m.toastMsg, fmt.Sprintf("#%d ", id)) || !strings.Contains(m.toastMsg, "waiting for input") {
+		t.Fatalf("want a waiting toast after the window, got %q", m.toastMsg)
+	}
+	if got := statusOf(t, m, id); got != "ongoing" {
+		t.Errorf("status = %q, the watcher must never move a card", got)
 	}
 
-	reconcileAt(m, flatlineAfter+10*time.Second, map[int64]string{id: "working"})
-	if got := statusOf(t, m, id); got != "ongoing" {
-		t.Errorf("after the agent resumed status = %q, want ongoing", got)
+	m.toastMsg = ""
+	reconcileAt(m, waitAfter+10*time.Second, waiting)
+	if m.toastMsg != "" {
+		t.Errorf("repeat toast while still waiting: %q", m.toastMsg)
+	}
+}
+
+func TestWatcher_NotifiesAgainAfterAnotherPrompt(t *testing.T) {
+	m := newTestModel(t)
+	id := addCard(t, m, "ongoing")
+	waiting := map[int64]string{id: "blocked"}
+
+	reconcileAt(m, 0, waiting)
+	reconcileAt(m, waitAfter+time.Second, waiting)
+	reconcileAt(m, waitAfter+4*time.Second, map[int64]string{id: "working"})
+
+	m.toastMsg = ""
+	reconcileAt(m, 200*time.Second, waiting)
+	reconcileAt(m, 200*time.Second+waitAfter+time.Second, waiting)
+	if m.toastMsg == "" {
+		t.Error("a second prompt should toast again")
 	}
 }
 
@@ -63,53 +86,54 @@ func TestWatcher_AnsweredPromptRestartsTheClock(t *testing.T) {
 	reconcileAt(m, 0, map[int64]string{id: "blocked"})
 	reconcileAt(m, 30*time.Second, map[int64]string{id: "working"}) // prompt answered
 	reconcileAt(m, 100*time.Second, map[int64]string{id: "blocked"})
-	reconcileAt(m, 100*time.Second+flatlineAfter-time.Second, map[int64]string{id: "blocked"})
-	if got := statusOf(t, m, id); got != "ongoing" {
-		t.Errorf("status = %q, want ongoing: the 90s must count from the second prompt", got)
+	reconcileAt(m, 100*time.Second+waitAfter-time.Second, map[int64]string{id: "blocked"})
+	if m.toastMsg != "" {
+		t.Errorf("toast %q: the 90s must count from the second prompt", m.toastMsg)
 	}
 }
 
-func TestWatcher_NeverReturnsAHandBlockedCard(t *testing.T) {
+func TestWatcher_GroupsSimultaneousWaits(t *testing.T) {
 	m := newTestModel(t)
-	id := addCard(t, m, "blocked") // blocked by the user, not the watcher
+	a := addCard(t, m, "ongoing")
+	b := addCard(t, m, "ongoing")
+	waiting := map[int64]string{a: "blocked", b: "blocked"}
 
-	reconcileAt(m, 0, map[int64]string{id: "working"})
-	reconcileAt(m, time.Hour, map[int64]string{id: "working"})
-	if got := statusOf(t, m, id); got != "blocked" {
-		t.Errorf("status = %q, want blocked kept", got)
+	reconcileAt(m, 0, waiting)
+	reconcileAt(m, waitAfter+time.Second, waiting)
+	if want := fmt.Sprintf("#%d, #%d are waiting", a, b); !strings.Contains(m.toastMsg, want) {
+		t.Errorf("want one grouped toast, got %q", m.toastMsg)
 	}
 }
 
-func TestWatcher_DropsTrackingWhenTheUserMovesTheCard(t *testing.T) {
+func TestWatcher_OnlyWatchesOngoing(t *testing.T) {
+	m := newTestModel(t)
+	for _, status := range []string{"todo", "blocked", "in_review", "completed"} {
+		id := addCard(t, m, status)
+		waiting := map[int64]string{id: "blocked"}
+		reconcileAt(m, 0, waiting)
+		reconcileAt(m, time.Hour, waiting)
+		if m.toastMsg != "" {
+			t.Errorf("%s card toasted: %q", status, m.toastMsg)
+		}
+		if got := statusOf(t, m, id); got != status {
+			t.Errorf("%s card moved to %q", status, got)
+		}
+	}
+}
+
+func TestWatcher_DropsTrackingWhenTheCardLeavesOngoing(t *testing.T) {
 	m := newTestModel(t)
 	id := addCard(t, m, "ongoing")
 	waiting := map[int64]string{id: "blocked"}
 	reconcileAt(m, 0, waiting)
-	reconcileAt(m, flatlineAfter+time.Second, waiting) // watcher blocks it
 
 	if err := m.store.UpdateCardStatus(id, "in_review"); err != nil { // user takes over
 		t.Fatal(err)
 	}
 	_ = m.loadData()
-	reconcileAt(m, 3*time.Minute, map[int64]string{id: "working"})
-	if m.watch.autoBlocked[id] {
-		t.Error("autoBlocked still tracks a card the user moved away")
-	}
-	if got := statusOf(t, m, id); got != "in_review" {
-		t.Errorf("status = %q, want in_review untouched", got)
-	}
-}
-
-func TestWatcher_OnlyTouchesOngoingAndBlocked(t *testing.T) {
-	m := newTestModel(t)
-	for _, status := range []string{"todo", "in_review", "completed"} {
-		id := addCard(t, m, status)
-		reconcileAt(m, 0, map[int64]string{id: "blocked"})
-		reconcileAt(m, time.Hour, map[int64]string{id: "blocked"})
-		reconcileAt(m, 2*time.Hour, map[int64]string{id: "working"})
-		if got := statusOf(t, m, id); got != status {
-			t.Errorf("%s card moved to %q", status, got)
-		}
+	reconcileAt(m, time.Minute, waiting)
+	if _, tracked := m.watch.waitingSince[id]; tracked {
+		t.Error("still tracking a card that left In Progress")
 	}
 }
 
@@ -120,15 +144,15 @@ func TestWatcher_WaitsOutAnOpenModal(t *testing.T) {
 	reconcileAt(m, 0, waiting)
 
 	m.modalStack = []modal{nil} // only the length is consulted
-	reconcileAt(m, flatlineAfter+time.Second, waiting)
-	if got := statusOf(t, m, id); got != "ongoing" {
-		t.Fatalf("moved while a modal was open: %q", got)
+	reconcileAt(m, waitAfter+time.Second, waiting)
+	if m.toastMsg != "" {
+		t.Fatalf("toasted while a modal was open: %q", m.toastMsg)
 	}
 
 	m.modalStack = nil
-	reconcileAt(m, flatlineAfter+2*time.Second, waiting)
-	if got := statusOf(t, m, id); got != "blocked" {
-		t.Errorf("after the modal closed status = %q, want blocked", got)
+	reconcileAt(m, waitAfter+2*time.Second, waiting)
+	if m.toastMsg == "" {
+		t.Error("should toast on the first poll after the modal closed")
 	}
 }
 
@@ -138,37 +162,16 @@ func TestWatcher_UnknownCardIsIgnored(t *testing.T) {
 	reconcileAt(m, time.Hour, map[int64]string{9999: "blocked"})
 }
 
-// Found live: after a permission prompt was approved the agent went waiting ->
-// done inside one 3s poll and was never seen "working".
-func TestWatcher_ReturnsTheCardWhenTheAgentStopsWaitingInAnyState(t *testing.T) {
-	for _, next := range []string{"working", "idle", "done"} {
-		m := newTestModel(t)
-		id := addCard(t, m, "ongoing")
-		waiting := map[int64]string{id: "blocked"}
-		reconcileAt(m, 0, waiting)
-		reconcileAt(m, flatlineAfter+time.Second, waiting)
-		if got := statusOf(t, m, id); got != "blocked" {
-			t.Fatalf("%s: setup: status = %q, want blocked", next, got)
-		}
-		reconcileAt(m, flatlineAfter+4*time.Second, map[int64]string{id: next})
-		if got := statusOf(t, m, id); got != "ongoing" {
-			t.Errorf("agent %s after waiting: status = %q, want ongoing", next, got)
-		}
-	}
-}
-
-func TestWatcher_KeepsTheCardBlockedWhenTheAgentIsGone(t *testing.T) {
+func TestColumnHeaderCountsWaitingAgents(t *testing.T) {
 	m := newTestModel(t)
-	id := addCard(t, m, "ongoing")
-	waiting := map[int64]string{id: "blocked"}
-	reconcileAt(m, 0, waiting)
-	reconcileAt(m, flatlineAfter+time.Second, waiting)
+	a := addCard(t, m, "ongoing")
+	b := addCard(t, m, "ongoing")
 
-	reconcileAt(m, time.Hour, map[int64]string{}) // agent exited
-	if got := statusOf(t, m, id); got != "blocked" {
-		t.Errorf("status = %q, want blocked kept when the agent is gone", got)
+	if got := m.renderColumn("ongoing", 40, 10); strings.Contains(got, "▲") {
+		t.Errorf("no agent waiting, header = %q", got)
 	}
-	if m.watch.autoBlocked[id] {
-		t.Error("tracking should be dropped once the agent is gone")
+	m.agents = map[int64]string{a: "blocked", b: "working"}
+	if got := m.renderColumn("ongoing", 40, 10); !strings.Contains(got, "▲1") {
+		t.Errorf("want ▲1 in the In Progress header, got %q", got)
 	}
 }

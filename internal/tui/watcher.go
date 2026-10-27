@@ -2,30 +2,28 @@ package tui
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// flatlineAfter is how long a card's agent must sit waiting for input before
-// the watcher moves the card to Blocked. A permission prompt answered within
-// the window never touches the board.
-const flatlineAfter = 90 * time.Second
+// waitAfter is how long a card's agent must sit waiting for input before the
+// watcher toasts about it. A permission prompt answered within the window
+// stays quiet.
+const waitAfter = 90 * time.Second
 
-// watcher moves cards between In Progress and Blocked from herdr agent state.
-// It never touches any other column: Completed stays with the ship skill and
-// In Review stays with the session or the user.
-//
-// A card is only moved back by the watcher if the watcher moved it there
-// (autoBlocked), as soon as its agent stops waiting; a card the user blocked
-// by hand stays blocked.
+// watcher tells the user when an In Progress card's agent has been waiting for
+// input for a while. It never changes a card's status: Blocked is the user's
+// own call, and the card already shows the waiting badge.
 type watcher struct {
 	waitingSince map[int64]time.Time // card id -> first poll seen waiting
-	autoBlocked  map[int64]bool      // cards this watcher moved to Blocked
+	notified     map[int64]bool      // cards already toasted for the current wait
 }
 
 func newWatcher() *watcher {
-	return &watcher{waitingSince: map[int64]time.Time{}, autoBlocked: map[int64]bool{}}
+	return &watcher{waitingSince: map[int64]time.Time{}, notified: map[int64]bool{}}
 }
 
 // cardStatus finds a card's current column in the loaded board.
@@ -40,10 +38,11 @@ func (m *Model) cardStatus(id int64) (string, bool) {
 	return "", false
 }
 
-// reconcileAgents applies one poll of agent states. It returns a toast Cmd
-// when a card moved. While a modal is open it does nothing, like the DB poll,
-// so the board never shifts under an edit in progress; the waiting clock keeps
-// running, so the move happens on the first poll after the modal closes.
+// reconcileAgents applies one poll of agent states and returns a toast Cmd
+// when a card's agent has waited past waitAfter. While a modal is open it does
+// nothing, like the DB poll, so a toast never lands on an edit in progress;
+// the waiting clock keeps running, so the toast fires on the first poll after
+// the modal closes.
 func (m *Model) reconcileAgents(states map[int64]string) tea.Cmd {
 	if m.blockingModal() {
 		return nil
@@ -52,72 +51,43 @@ func (m *Model) reconcileAgents(states map[int64]string) tea.Cmd {
 	w := m.watch
 
 	for id := range w.waitingSince {
-		if states[id] != "blocked" {
+		if status, _ := m.cardStatus(id); states[id] != "blocked" || status != "ongoing" {
 			delete(w.waitingSince, id)
+			delete(w.notified, id)
 		}
 	}
 
-	var cmds []tea.Cmd
+	var due []int64
 	for id, state := range states {
-		status, ok := m.cardStatus(id)
-		if !ok {
+		if state != "blocked" {
 			continue
 		}
-		switch {
-		case state == "blocked" && status == "ongoing":
-			since, seen := w.waitingSince[id]
-			if !seen {
-				w.waitingSince[id] = now
-				continue
-			}
-			if now.Sub(since) < flatlineAfter {
-				continue
-			}
-			if m.watcherMove(id, "blocked") {
-				w.autoBlocked[id] = true
-				delete(w.waitingSince, id)
-				cmds = append(cmds, m.toast(toastWarn, fmt.Sprintf(
-					"Wintermute: #%d to %s, its agent is waiting for input", id, statusLabel["blocked"])))
-			}
-		case state != "blocked" && status == "blocked" && w.autoBlocked[id]:
-			// Any state but waiting ends the reason for the block. An answered
-			// prompt can go waiting -> done inside one 3s poll, so "working"
-			// is not required.
-			if m.watcherMove(id, "ongoing") {
-				delete(w.autoBlocked, id)
-				cmds = append(cmds, m.toast(toastInfo, fmt.Sprintf(
-					"Wintermute: #%d back to %s, its agent is no longer waiting", id, statusLabel["ongoing"])))
-			}
+		if status, ok := m.cardStatus(id); !ok || status != "ongoing" {
+			continue
 		}
+		since, seen := w.waitingSince[id]
+		if !seen {
+			w.waitingSince[id] = now
+			continue
+		}
+		if w.notified[id] || now.Sub(since) < waitAfter {
+			continue
+		}
+		w.notified[id] = true
+		due = append(due, id)
+	}
+	if len(due) == 0 {
+		return nil
 	}
 
-	// Stop tracking cards that left Blocked (moved by hand) or whose agent is gone.
-	for id := range w.autoBlocked {
-		status, ok := m.cardStatus(id)
-		if !ok || status != "blocked" || states[id] == "" {
-			delete(w.autoBlocked, id)
-		}
+	sort.Slice(due, func(i, j int) bool { return due[i] < due[j] })
+	refs := make([]string, len(due))
+	for i, id := range due {
+		refs[i] = fmt.Sprintf("#%d", id)
 	}
-	return tea.Batch(cmds...)
-}
-
-// watcherMove writes the status change and reloads the board, keeping the
-// cursor on the same card. Reloading records the new revision, so the DB poll
-// does not report the watcher's own write as an external change.
-func (m *Model) watcherMove(id int64, status string) bool {
-	if err := m.store.UpdateCardStatus(id, status); err != nil {
-		return false
+	verb := "is"
+	if len(due) > 1 {
+		verb = "are"
 	}
-	cur := m.currentCard()
-	_ = m.loadData()
-	if cur != nil {
-		for i, c := range m.visibleCards(statuses[m.col]) {
-			if c.ID == cur.ID {
-				m.row = i
-				break
-			}
-		}
-	}
-	m.clampRow()
-	return true
+	return m.toast(toastWarn, fmt.Sprintf("Wintermute: %s %s waiting for input", strings.Join(refs, ", "), verb))
 }
