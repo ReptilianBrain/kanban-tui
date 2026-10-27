@@ -157,7 +157,7 @@ func agentMarkup(state string) string {
 // border and background): "#id badge title", then an optional meta line.
 // agent is the card's herdr agent status, or "" when it has none.
 func cardBlockLines(card db.Card, agent string) []string {
-	idPrefix := dimStyle.Render("#" + itoa64(card.ID))
+	idPrefix := cyanStyle.Render("#" + itoa64(card.ID))
 	badge := priorityBadge(card.Priority)
 	title := card.Title
 	first := idPrefix + " " + badge + boldStyle.Render(title)
