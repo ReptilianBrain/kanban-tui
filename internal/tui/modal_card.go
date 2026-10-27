@@ -222,11 +222,11 @@ func (c *cardModal) Update(msg tea.Msg, m *Model) tea.Cmd {
 }
 
 func fieldLine(fieldLabel string, focused bool, value string) string {
-	lbl := hintStyle.Render(fieldLabel)
+	lbl := textStyle.Render(fieldLabel)
 	if focused {
 		lbl = accentBold.Render("▸ " + fieldLabel)
 	} else {
-		lbl = hintStyle.Render("  " + fieldLabel)
+		lbl = textStyle.Render("  " + fieldLabel)
 	}
 	return lbl + "\n" + value
 }
@@ -268,7 +268,7 @@ func (c *cardModal) View(m *Model) string {
 	}
 
 	b.WriteString("\n\n")
-	b.WriteString(hintStyle.Render("Tab: next field   Ctrl+S: save   Esc: cancel"))
+	b.WriteString(modalHintStyle.Render("Tab: next field   Ctrl+S: save   Esc: cancel"))
 
 	return renderModal(modalBoxStyle, 64, b.String())
 }

@@ -146,7 +146,7 @@ func agentMarkup(state string) string {
 	case "blocked":
 		return warnBoldStyle.Render("▲ waiting")
 	case "idle":
-		return dimStyle.Render("◌ idle")
+		return textStyle.Render("◌ idle")
 	case "done":
 		return successStyle.Render("✓ done")
 	}

@@ -116,7 +116,7 @@ func (lm *labelManagerModal) View(m *Model) string {
 	b.WriteString(accentBold.Render("Manage Labels"))
 	b.WriteString("\n\n")
 	if len(lm.labels) == 0 {
-		b.WriteString(dimStyle.Render("No labels defined"))
+		b.WriteString(textStyle.Render("No labels defined"))
 	} else {
 		for i, l := range lm.labels {
 			bar := "  "
@@ -128,7 +128,7 @@ func (lm *labelManagerModal) View(m *Model) string {
 		}
 	}
 	b.WriteString("\n")
-	b.WriteString(hintStyle.Render("a:Add  e:Edit  d:Delete  Esc:Back"))
+	b.WriteString(modalHintStyle.Render("a:Add  e:Edit  d:Delete  Esc:Back"))
 	return renderModal(modalBoxStyle, 50, b.String())
 }
 
@@ -178,6 +178,6 @@ func (l *labelNameModal) View(m *Model) string {
 		heading = "Rename Label"
 	}
 	body := accentBold.Render(heading) + "\n\n" + l.input.View() +
-		"\n\n" + hintStyle.Render("Enter: save   Esc: cancel")
+		"\n\n" + modalHintStyle.Render("Enter: save   Esc: cancel")
 	return renderModal(modalBoxStyle, 48, body)
 }

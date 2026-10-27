@@ -184,7 +184,7 @@ func (n *notesModal) View(m *Model) string {
 	b.WriteString(n.input.View())
 	b.WriteString("\n\n")
 	if len(n.notes) == 0 {
-		b.WriteString(dimStyle.Render("No notes"))
+		b.WriteString(textStyle.Render("No notes"))
 	} else {
 		for i, note := range n.notes {
 			text := flattenNote(note.Text)
@@ -196,12 +196,12 @@ func (n *notesModal) View(m *Model) string {
 			if i == n.row {
 				bar = selectedBarStyle.Render("▌") + " "
 			}
-			b.WriteString(bar + textStyle.Render(text) + "  " + dimStyle.Render(date))
+			b.WriteString(bar + textStyle.Render(text) + "  " + modalHintStyle.Render(date))
 			b.WriteString("\n")
 		}
 	}
 	b.WriteString("\n")
-	b.WriteString(hintStyle.Render(
+	b.WriteString(modalHintStyle.Render(
 		"Enter:Add  ↑/↓:Select  Esc:List mode  Esc Esc:Close\n" +
 			"List mode — e:Edit  d:Delete  p:Promote to card  i:Type  o:Close",
 	))

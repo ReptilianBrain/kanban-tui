@@ -26,7 +26,7 @@ func newCardDetailModal(card db.Card) *cardDetailModal {
 	vp := viewport.New(60, 8)
 	desc := card.Description
 	if desc == "" {
-		desc = dimStyle.Render("(no description)")
+		desc = textStyle.Render("(no description)")
 	} else {
 		desc = lipgloss.NewStyle().Width(vp.Width).Render(desc)
 	}
@@ -68,7 +68,7 @@ func (d *cardDetailModal) View(m *Model) string {
 	var b strings.Builder
 	b.WriteString(accentBold.Render(c.Title))
 	b.WriteString("\n")
-	b.WriteString(hintStyle.Render(fmt.Sprintf("[ %s ]  #%d", statusLabel[c.Status], c.ID)))
+	b.WriteString(modalHintStyle.Render(fmt.Sprintf("[ %s ]  #%d", statusLabel[c.Status], c.ID)))
 	b.WriteString("\n")
 	prio := priorityDisplay[c.Priority]
 	if prio == "" {
@@ -106,9 +106,9 @@ func (d *cardDetailModal) View(m *Model) string {
 	if len(updated) >= 10 {
 		updated = updated[:10]
 	}
-	b.WriteString(hintStyle.Render(fmt.Sprintf("Created: %s   Updated: %s", created, updated)))
+	b.WriteString(modalHintStyle.Render(fmt.Sprintf("Created: %s   Updated: %s", created, updated)))
 	b.WriteString("\n\n")
-	b.WriteString(hintStyle.Render("↑/↓/PgUp/PgDn/Home/End: scroll description   H: open in herdr   Esc: close"))
+	b.WriteString(modalHintStyle.Render("↑/↓/PgUp/PgDn/Home/End: scroll description   H: open in herdr   Esc: close"))
 
 	return renderModal(modalBoxStyle, 72, b.String())
 }

@@ -65,7 +65,7 @@ func (f *filterModal) Update(msg tea.Msg, m *Model) tea.Cmd {
 func (f *filterModal) View(m *Model) string {
 	body := accentBold.Render("Filter by label") + "\n\n"
 	if len(f.labels) == 0 {
-		body += hintStyle.Render("No labels defined — press 't' to manage labels.") + "\n\n"
+		body += modalHintStyle.Render("No labels defined — press 't' to manage labels.") + "\n\n"
 	} else {
 		name := "(all cards)"
 		if f.idx > 0 {
@@ -73,6 +73,6 @@ func (f *filterModal) View(m *Model) string {
 		}
 		body += pickerValue(name, true) + "\n\n"
 	}
-	body += hintStyle.Render("←/→: change   Enter: apply   Esc: cancel")
+	body += modalHintStyle.Render("←/→: change   Enter: apply   Esc: cancel")
 	return renderModal(modalWarnBoxStyle, 52, body)
 }
