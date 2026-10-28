@@ -215,16 +215,47 @@ func parseNaiveDateTime(ts string) (time.Time, bool) {
 	return time.Time{}, false
 }
 
-// validateDue rejects a non-empty due date that isn't YYYY-MM-DD. The empty
-// string means "clear" and is always valid.
-func validateDue(cmd *cobra.Command, due string) error {
+// relativeDue matches "+7d" (calendar days) and "+7bd" (business days).
+var relativeDue = regexp.MustCompile(`^\+(\d{1,4})(b?d)$`)
+
+// parseDue turns a --due value into YYYY-MM-DD relative to now. The empty
+// string means "clear" and passes through. Business days skip weekends only;
+// public holidays are not known to the binary.
+func parseDue(due string, now time.Time) (string, error) {
 	if due == "" {
-		return nil
+		return "", nil
+	}
+	if m := relativeDue.FindStringSubmatch(due); m != nil {
+		n, _ := strconv.Atoi(m[1])
+		if m[2] == "bd" {
+			return addBusinessDays(now, n).Format("2006-01-02"), nil
+		}
+		return now.AddDate(0, 0, n).Format("2006-01-02"), nil
 	}
 	if _, err := time.ParseInLocation("2006-01-02", due, time.Local); err != nil {
-		return fail(cmd, "due date '%s' must be in YYYY-MM-DD format", due)
+		return "", fmt.Errorf("due date '%s' must be YYYY-MM-DD, +Nd or +Nbd", due)
 	}
-	return nil
+	return due, nil
+}
+
+func addBusinessDays(from time.Time, n int) time.Time {
+	d := from
+	for n > 0 {
+		d = d.AddDate(0, 0, 1)
+		if wd := d.Weekday(); wd != time.Saturday && wd != time.Sunday {
+			n--
+		}
+	}
+	return d
+}
+
+// resolveDue is parseDue for a command: a bad value is a business error.
+func resolveDue(cmd *cobra.Command, due string) (string, error) {
+	resolved, err := parseDue(due, time.Now())
+	if err != nil {
+		return "", fail(cmd, "%s", err.Error())
+	}
+	return resolved, nil
 }
 
 // dueStatus buckets a due date as overdue, today, soon (within 3 days),

@@ -52,7 +52,8 @@ func newUpdateCmd(ctx *appCtx) *cobra.Command {
 
 			newDue := card.DueDate
 			if cmd.Flags().Changed("due") {
-				if err := validateDue(cmd, due); err != nil {
+				var err error
+				if due, err = resolveDue(cmd, due); err != nil {
 					return err
 				}
 				if due == "" {
@@ -114,7 +115,7 @@ func newUpdateCmd(ctx *appCtx) *cobra.Command {
 	cmd.Flags().StringVarP(&description, "description", "m", "", "New description.")
 	cmd.Flags().VarP(&choiceValue{value: &status, allowed: allStatuses}, "status", "s", "Move to a different column.")
 	cmd.Flags().VarP(&choiceValue{value: &priority, allowed: priorities}, "priority", "p", "")
-	cmd.Flags().StringVar(&due, "due", "", `Due date YYYY-MM-DD, or "" to clear.`)
+	cmd.Flags().StringVar(&due, "due", "", `Due date: YYYY-MM-DD, +Nd, +Nbd (weekends skipped), or "" to clear.`)
 	cmd.Flags().StringVar(&label, "label", "", `Label name, or "" to clear.`)
 	cmd.Flags().StringVar(&jira, "jira", "", `Jira ticket key (ABC-123) or browse URL, or "" to clear.`)
 	cmd.Flags().BoolVar(&asJSON, "json", false, "Print the resulting card as JSON.")

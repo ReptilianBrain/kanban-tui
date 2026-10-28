@@ -14,11 +14,14 @@ import (
 
 func newListCmd(ctx *appCtx) *cobra.Command {
 	var (
-		status string
-		label  string
-		search string
-		asJSON bool
-		fields []string
+		status  string
+		label   string
+		search  string
+		asJSON  bool
+		fields  []string
+		title   string
+		overdue bool
+		noDue   bool
 	)
 
 	cmd := &cobra.Command{
@@ -40,6 +43,15 @@ func newListCmd(ctx *appCtx) *cobra.Command {
 					continue
 				}
 				if search != "" && !db.CardMatchesSearch(c, search) {
+					continue
+				}
+				if title != "" && !strings.Contains(strings.ToLower(c.Title), strings.ToLower(title)) {
+					continue
+				}
+				if overdue && (c.Status == "completed" || dueStatus(c.DueDate) != "overdue") {
+					continue
+				}
+				if noDue && (c.Status == "completed" || (c.DueDate != nil && *c.DueDate != "")) {
 					continue
 				}
 				cards = append(cards, c)
@@ -95,6 +107,10 @@ func newListCmd(ctx *appCtx) *cobra.Command {
 	cmd.Flags().VarP(&choiceValue{value: &status, allowed: allStatuses}, "status", "s", "Only cards in this column.")
 	cmd.Flags().StringVar(&label, "label", "", "Only cards with this label.")
 	cmd.Flags().StringVar(&search, "search", "", "Fuzzy-search title, description & Jira key.")
+	cmd.Flags().StringVar(&title, "title", "", "Only cards whose title contains this text (case-insensitive; unlike --search, descriptions are ignored).")
+	cmd.Flags().BoolVar(&overdue, "overdue", false, "Only open cards past their due date.")
+	cmd.Flags().BoolVar(&noDue, "no-due", false, "Only open cards with no due date.")
+	cmd.MarkFlagsMutuallyExclusive("overdue", "no-due")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "Print cards as a JSON array.")
 	cmd.Flags().StringSliceVar(&fields, "fields", nil, "Comma-separated card fields to print as JSON (implies --json), e.g. id,title,status. Descriptions make the full output large.")
 	return cmd

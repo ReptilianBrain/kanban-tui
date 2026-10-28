@@ -4,21 +4,34 @@ import (
 	"bytes"
 	"encoding/json"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/ReptilianBrain/kanban-tui/internal/db"
 )
 
-func TestValidateDue(t *testing.T) {
-	cmd := newRootCmd()
-	if err := validateDue(cmd, ""); err != nil {
-		t.Errorf("empty due should be valid, got %v", err)
+func TestParseDue(t *testing.T) {
+	tue := time.Date(2026, 10, 27, 9, 0, 0, 0, time.Local)
+	fri := time.Date(2026, 10, 30, 9, 0, 0, 0, time.Local)
+	cases := []struct{ in, want string }{
+		{"", ""},
+		{"2026-01-05", "2026-01-05"},
+		{"+0d", "2026-10-27"},
+		{"+3d", "2026-10-30"},
+		{"+7bd", "2026-11-05"},
 	}
-	if err := validateDue(cmd, "2026-01-05"); err != nil {
-		t.Errorf("valid due date rejected: %v", err)
+	for _, c := range cases {
+		got, err := parseDue(c.in, tue)
+		if err != nil || got != c.want {
+			t.Errorf("parseDue(%q) = %q, %v; want %q", c.in, got, err, c.want)
+		}
 	}
-	for _, bad := range []string{"not-a-date", "2026/01/05", "2026-13-01", "2026-02-30"} {
-		if err := validateDue(cmd, bad); err == nil {
+	if got, _ := parseDue("+1bd", fri); got != "2026-11-02" {
+		t.Errorf("+1bd from a Friday = %q, want the Monday 2026-11-02", got)
+	}
+	for _, bad := range []string{"not-a-date", "2026/01/05", "2026-13-01", "2026-02-30", "+7", "+bd", "-3d", "+7w"} {
+		if _, err := parseDue(bad, tue); err == nil {
 			t.Errorf("expected error for due date %q", bad)
 		}
 	}
@@ -244,5 +257,45 @@ func TestPrintCompactArray(t *testing.T) {
 	var parsed []map[string]any
 	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil || len(parsed) != 2 {
 		t.Errorf("output must be valid JSON with 2 items: %v", err)
+	}
+}
+
+func TestExecuteListFilters(t *testing.T) {
+	testDBPath(t)
+	for _, args := range [][]string{
+		{"add", "Past due", "--due", "2020-01-01"},
+		{"add", "Relative", "--due", "+7bd"},
+		{"add", "No date"},
+	} {
+		if code := Execute(args); code != 0 {
+			t.Fatalf("%v: exit code %d, want 0", args, code)
+		}
+	}
+	if code := Execute([]string{"add", "Bad", "--due", "+7w"}); code != 1 {
+		t.Fatalf("bad relative due: exit code %d, want 1", code)
+	}
+
+	out := func(args ...string) string {
+		t.Helper()
+		root := newRootCmd()
+		var buf bytes.Buffer
+		root.SetOut(&buf)
+		root.SetArgs(args)
+		if err := root.Execute(); err != nil {
+			t.Fatalf("%v: %v", args, err)
+		}
+		return buf.String()
+	}
+	if got := out("list", "--overdue", "--fields", "id"); !strings.Contains(got, `"id":1`) || strings.Contains(got, `"id":2`) {
+		t.Errorf("--overdue = %s, want only card 1", got)
+	}
+	if got := out("list", "--no-due", "--fields", "id"); !strings.Contains(got, `"id":3`) || strings.Contains(got, `"id":1`) {
+		t.Errorf("--no-due = %s, want only card 3", got)
+	}
+	if got := out("list", "--title", "RELATIVE", "--fields", "id"); !strings.Contains(got, `"id":2`) || strings.Contains(got, `"id":1`) {
+		t.Errorf("--title = %s, want only card 2", got)
+	}
+	if code := Execute([]string{"list", "--overdue", "--no-due"}); code != 2 {
+		t.Fatalf("--overdue with --no-due: exit code %d, want 2", code)
 	}
 }

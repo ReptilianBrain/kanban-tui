@@ -26,7 +26,8 @@ func newAddCmd(ctx *appCtx) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			title := args[0]
 
-			if err := validateDue(cmd, due); err != nil {
+			var err error
+			if due, err = resolveDue(cmd, due); err != nil {
 				return err
 			}
 			jiraKey, err := db.NormalizeJiraKey(jira)
@@ -74,7 +75,7 @@ func newAddCmd(ctx *appCtx) *cobra.Command {
 	cmd.Flags().StringVarP(&description, "description", "m", "", "Card description.")
 	cmd.Flags().VarP(newChoiceFlag(&status, allStatuses, "todo"), "status", "s", "Column to create the card in.")
 	cmd.Flags().VarP(newChoiceFlag(&priority, priorities, "medium"), "priority", "p", "")
-	cmd.Flags().StringVar(&due, "due", "", "Due date (YYYY-MM-DD).")
+	cmd.Flags().StringVar(&due, "due", "", "Due date: YYYY-MM-DD, +Nd (calendar days) or +Nbd (business days, weekends skipped).")
 	cmd.Flags().StringVar(&label, "label", "", "Label name (created if it's new).")
 	cmd.Flags().StringVar(&jira, "jira", "", "Jira ticket key (ABC-123) or browse URL.")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "Print the resulting card as JSON.")
