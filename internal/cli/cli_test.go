@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"bytes"
+	"encoding/json"
 	"path/filepath"
 	"testing"
 
@@ -189,5 +191,58 @@ func TestExecuteJiraFlag(t *testing.T) {
 	}
 	if k := jiraOf(); k != nil {
 		t.Fatalf("jira key after clearing = %v, want nil", *k)
+	}
+}
+
+func TestProjectCards(t *testing.T) {
+	label := "Data"
+	cards := []db.Card{{ID: 7, Title: "Fix it", Description: "long text", Status: "todo", Label: &label}}
+
+	got, err := projectCards(cards, []string{"title", "id", "label"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := json.Marshal(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := `[{"title":"Fix it","id":7,"label":"Data"}]`; string(b) != want {
+		t.Errorf("projection = %s, want %s", b, want)
+	}
+
+	if _, err := projectCards(cards, []string{"id", "nope"}); err == nil {
+		t.Error("unknown field must be rejected")
+	}
+}
+
+func TestExecuteListFields(t *testing.T) {
+	testDBPath(t)
+	if code := Execute([]string{"add", "Card one"}); code != 0 {
+		t.Fatalf("add: exit code %d, want 0", code)
+	}
+	if code := Execute([]string{"list", "--fields", "id,title"}); code != 0 {
+		t.Fatalf("list --fields: exit code %d, want 0", code)
+	}
+	if code := Execute([]string{"list", "--fields", "id,bogus"}); code != 2 {
+		t.Fatalf("list with an unknown field: exit code %d, want 2", code)
+	}
+}
+
+func TestPrintCompactArray(t *testing.T) {
+	cards := []db.Card{{ID: 1, Title: "a"}, {ID: 2, Title: "b"}}
+	items, err := projectCards(cards, []string{"id", "title"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	if err := printCompactArray(&buf, items); err != nil {
+		t.Fatal(err)
+	}
+	if want := "[\n{\"id\":1,\"title\":\"a\"},\n{\"id\":2,\"title\":\"b\"}\n]\n"; buf.String() != want {
+		t.Errorf("got %q, want %q", buf.String(), want)
+	}
+	var parsed []map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil || len(parsed) != 2 {
+		t.Errorf("output must be valid JSON with 2 items: %v", err)
 	}
 }

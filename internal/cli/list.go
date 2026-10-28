@@ -1,7 +1,10 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -15,6 +18,7 @@ func newListCmd(ctx *appCtx) *cobra.Command {
 		label  string
 		search string
 		asJSON bool
+		fields []string
 	)
 
 	cmd := &cobra.Command{
@@ -41,6 +45,13 @@ func newListCmd(ctx *appCtx) *cobra.Command {
 				cards = append(cards, c)
 			}
 
+			if len(fields) > 0 {
+				projected, err := projectCards(cards, fields)
+				if err != nil {
+					return err
+				}
+				return printCompactArray(cmd.OutOrStdout(), projected)
+			}
 			if asJSON {
 				return printJSON(cmd.OutOrStdout(), cards)
 			}
@@ -85,5 +96,89 @@ func newListCmd(ctx *appCtx) *cobra.Command {
 	cmd.Flags().StringVar(&label, "label", "", "Only cards with this label.")
 	cmd.Flags().StringVar(&search, "search", "", "Fuzzy-search title, description & Jira key.")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "Print cards as a JSON array.")
+	cmd.Flags().StringSliceVar(&fields, "fields", nil, "Comma-separated card fields to print as JSON (implies --json), e.g. id,title,status. Descriptions make the full output large.")
 	return cmd
+}
+
+// orderedFields marshals as a JSON object whose keys keep the order the user
+// asked for, which a plain map would not.
+type orderedFields struct {
+	keys   []string
+	values map[string]json.RawMessage
+}
+
+func (o orderedFields) MarshalJSON() ([]byte, error) {
+	var b strings.Builder
+	b.WriteByte('{')
+	for i, k := range o.keys {
+		if i > 0 {
+			b.WriteByte(',')
+		}
+		name, _ := json.Marshal(k)
+		b.Write(name)
+		b.WriteByte(':')
+		b.Write(o.values[k])
+	}
+	b.WriteByte('}')
+	return []byte(b.String()), nil
+}
+
+// projectCards keeps only the named JSON fields of each card. Valid names are
+// the Card JSON keys, read off a marshalled zero value so the list cannot
+// drift from the struct.
+func projectCards(cards []db.Card, fields []string) ([]orderedFields, error) {
+	zero, err := json.Marshal(db.Card{})
+	if err != nil {
+		return nil, err
+	}
+	var valid map[string]json.RawMessage
+	if err := json.Unmarshal(zero, &valid); err != nil {
+		return nil, err
+	}
+	for _, f := range fields {
+		if _, ok := valid[f]; !ok {
+			names := make([]string, 0, len(valid))
+			for k := range valid {
+				names = append(names, k)
+			}
+			sort.Strings(names)
+			return nil, fmt.Errorf("unknown field %q: must be one of %s", f, strings.Join(names, ", "))
+		}
+	}
+
+	out := make([]orderedFields, 0, len(cards))
+	for _, c := range cards {
+		raw, err := json.Marshal(c)
+		if err != nil {
+			return nil, err
+		}
+		var all map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &all); err != nil {
+			return nil, err
+		}
+		out = append(out, orderedFields{keys: fields, values: all})
+	}
+	return out, nil
+}
+
+// printCompactArray prints a JSON array with one compact element per line:
+// still valid JSON for jq, but far smaller than the indented form when a
+// caller only asked for a few fields.
+func printCompactArray(w io.Writer, items []orderedFields) error {
+	var b strings.Builder
+	b.WriteString("[\n")
+	for i, it := range items {
+		raw, err := it.MarshalJSON()
+		if err != nil {
+			return err
+		}
+		b.Write(raw)
+		if i < len(items)-1 {
+			b.WriteByte(',')
+		}
+		b.WriteByte('\n')
+	}
+	b.WriteString("]\n")
+	_, err := io.WriteString(w, b.String())
+	return err
 }
