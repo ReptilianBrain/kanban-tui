@@ -28,7 +28,7 @@ func TestMatrixOrphans_HiddenByDefault(t *testing.T) {
 	if len(rows) != 1 || rows[0].card.ID != card {
 		t.Fatalf("rows = %v, want only card %d", rows, card)
 	}
-	if !strings.Contains(m.topModal().(*matrixModal).View(m), "o: show 2 agents") {
+	if !strings.Contains(m.topModal().(*matrixModal).View(m), "o: show 2 orphans") {
 		t.Error("the hint should advertise the hidden orphans")
 	}
 }
@@ -112,4 +112,24 @@ func TestMatrixOrphans_PollFeedsTheModel(t *testing.T) {
 	if len(m.orphans) != 0 {
 		t.Errorf("a disabled herdr should clear the orphans, got %v", m.orphans)
 	}
+}
+
+// The widest toggle line (a, o and f together) must stay on one line: the
+// modal hard-wraps, which once split a hint mid-word.
+func TestMatrixOrphans_ToggleHintsStayOnOneLine(t *testing.T) {
+	m, _ := withOrphans(t)
+	addCard(t, m, "blocked") // agentless Blocked: makes f advertise a hidden count
+	send(m, "a")
+	view := m.topModal().(*matrixModal).View(m)
+	for _, line := range strings.Split(view, "\n") {
+		if strings.Contains(line, "a: agents only") {
+			for _, want := range []string{"o: show 2 orphans", "f: show", " hidden)"} {
+				if !strings.Contains(line, want) {
+					t.Errorf("toggle line %q is missing %q", line, want)
+				}
+			}
+			return
+		}
+	}
+	t.Error("no toggle line in the view")
 }

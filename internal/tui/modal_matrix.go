@@ -244,11 +244,13 @@ func (mm *matrixModal) View(m *Model) string {
 		b.WriteString("\n")
 	}
 	b.WriteString("\n")
-	hint := "↑↓: select   Enter: jump to agent   a: agents only / all " + cardNouns() + " in flight"
+	// Two lines: navigation and close first, then the view toggles. One long
+	// line wrapped mid-word at the modal width.
+	hint := "a: agents only / all " + cardNouns() + " in flight"
 	if mm.showOrphans {
-		hint += "   o: hide agents with no " + cardNoun()
+		hint += "   o: hide orphans"
 	} else if n := len(m.orphans); n > 0 {
-		hint += fmt.Sprintf("   o: show %d agents with no %s", n, cardNoun())
+		hint += fmt.Sprintf("   o: show %d orphans", n)
 	}
 	if mm.showAll {
 		switch {
@@ -260,7 +262,9 @@ func (mm *matrixModal) View(m *Model) string {
 			hint += "   f: show " + statusLabel["blocked"]
 		}
 	}
-	b.WriteString(cyanStyle.Render(hint + "   Esc/m: close"))
+	b.WriteString(cyanStyle.Render("↑↓: select   Enter: jump to agent   Esc/m: close"))
+	b.WriteString("\n")
+	b.WriteString(cyanStyle.Render(hint))
 	b.WriteString("\n")
 	b.WriteString(cyanStyle.Render("Cycle: total spend across sessions"))
 	return renderModal(modalBoxStyle, 112, b.String())
