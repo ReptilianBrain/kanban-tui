@@ -117,3 +117,15 @@ func TestFocusAgent(t *testing.T) {
 		t.Error("a herdr failure should surface as an error")
 	}
 }
+
+func TestUnmatched(t *testing.T) {
+	got := Unmatched([]AgentInfo{
+		{PaneID: "p1", CWD: "/home/me/.herdr/worktrees/r/card-12-x", Status: "working"},
+		{PaneID: "p2", CWD: "/home/me/scratch", Status: "idle"},
+		{PaneID: "p3", CWD: "/home/me/other", Status: "blocked"},
+		{PaneID: "p4", CWD: "/home/me/odd", Status: "unknown"},
+	})
+	if len(got) != 2 || got[0].PaneID != "p3" || got[1].PaneID != "p2" {
+		t.Errorf("Unmatched = %+v, want p3 (blocked) then p2, no card agent, no unknown", got)
+	}
+}

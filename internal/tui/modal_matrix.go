@@ -28,6 +28,7 @@ import (
 type matrixModal struct {
 	showAll      bool
 	showFlatline bool
+	showOrphans  bool
 	cursor       int
 	cardID       int64
 }
@@ -50,6 +51,8 @@ func (mm *matrixModal) Update(msg tea.Msg, m *Model) tea.Cmd {
 		}
 	case "a":
 		mm.showAll = !mm.showAll
+	case "o":
+		mm.showOrphans = !mm.showOrphans
 	case "f":
 		if mm.showAll {
 			mm.showFlatline = !mm.showFlatline
@@ -108,7 +111,10 @@ func (mm *matrixModal) jump(m *Model) tea.Cmd {
 	if i < 0 {
 		return nil
 	}
-	pane := m.agentPanes[rows[i].card.ID]
+	pane := rows[i].pane
+	if pane == "" {
+		pane = m.agentPanes[rows[i].card.ID]
+	}
 	if pane == "" {
 		return m.toast(toastWarn, fmt.Sprintf("No agent for this %s", cardNoun()))
 	}
@@ -133,6 +139,7 @@ func (m *Model) actionMatrix() tea.Cmd {
 type matrixRow struct {
 	card  db.Card
 	agent string
+	pane  string // set only on an orphan row (an agent with no card)
 }
 
 // agentRank orders rows: an agent waiting on you first, no agent last.
@@ -140,7 +147,11 @@ var agentRank = map[string]int{"blocked": 0, "working": 1, "idle": 2, "done": 3,
 
 // rows is what the modal currently lists.
 func (mm *matrixModal) rows(m *Model) []matrixRow {
-	return m.matrixRows(mm.showAll, mm.showFlatline)
+	rows := m.matrixRows(mm.showAll, mm.showFlatline)
+	if mm.showOrphans {
+		rows = append(rows, m.orphanRows()...)
+	}
+	return rows
 }
 
 // matrixRows lists the cards with an agent, most urgent first; all adds the
@@ -213,16 +224,20 @@ func (mm *matrixModal) View(m *Model) string {
 			agent = textStyle.Render("no agent")
 		}
 		cycle := textStyle.Render("-")
-		if c := m.cycleText(r.card.ID); c != "" {
+		if c := m.cycleText(r.card.ID); c != "" && r.pane == "" {
 			cycle = textStyle.Render(c)
+		}
+		ident, status := fmt.Sprintf("#%d", r.card.ID), statusLabel[r.card.Status]
+		if r.pane != "" {
+			ident, status = "-", "no "+cardNoun()
 		}
 		bar := "  "
 		if i == sel {
 			bar = selectedBarStyle.Render("▌") + " "
 		}
-		line := bar + padCell(cyanStyle.Render(fmt.Sprintf("#%d", r.card.ID)), 6) +
+		line := bar + padCell(cyanStyle.Render(ident), 6) +
 			padCell(boldStyle.Render(clipRunes(r.card.Title, 30)), 32) +
-			padCell(textStyle.Render(statusLabel[r.card.Status]), 12) +
+			padCell(textStyle.Render(status), 12) +
 			padCell(agent, 12) +
 			padCell(cycle, 9)
 		b.WriteString(line)
@@ -230,6 +245,11 @@ func (mm *matrixModal) View(m *Model) string {
 	}
 	b.WriteString("\n")
 	hint := "↑↓: select   Enter: jump to agent   a: agents only / all " + cardNouns() + " in flight"
+	if mm.showOrphans {
+		hint += "   o: hide agents with no " + cardNoun()
+	} else if n := len(m.orphans); n > 0 {
+		hint += fmt.Sprintf("   o: show %d agents with no %s", n, cardNoun())
+	}
 	if mm.showAll {
 		switch {
 		case mm.showFlatline:
