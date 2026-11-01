@@ -31,6 +31,11 @@ func ListAgents(ctx context.Context) ([]AgentInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+	return parseAgents(result), nil
+}
+
+// parseAgents reads the "agents" array of a `herdr agent list` result.
+func parseAgents(result map[string]any) []AgentInfo {
 	raw, _ := result["agents"].([]any)
 	agents := make([]AgentInfo, 0, len(raw))
 	for _, item := range raw {
@@ -41,9 +46,10 @@ func ListAgents(ctx context.Context) ([]AgentInfo, error) {
 		pane, _ := entry["pane_id"].(string)
 		cwd, _ := entry["cwd"].(string)
 		status, _ := entry["agent_status"].(string)
-		agents = append(agents, AgentInfo{PaneID: pane, CWD: cwd, Status: status})
+		title, _ := entry["terminal_title_stripped"].(string)
+		agents = append(agents, AgentInfo{PaneID: pane, CWD: cwd, Status: status, Title: title})
 	}
-	return agents, nil
+	return agents
 }
 
 var cardPathRE = regexp.MustCompile(`(?:^|/)card-(\d+)-`)

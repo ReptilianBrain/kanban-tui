@@ -317,7 +317,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		var moved tea.Cmd
 		if msg.err == nil {
-			m.agents, m.agentPanes = msg.states, msg.panes
+			m.agents, m.agentPanes, m.orphans = msg.states, msg.panes, msg.orphans
 			moved = m.reconcileAgents(msg.states)
 		}
 		return m, tea.Batch(moved, pollAgentsCmd(agentPollEvery))

@@ -129,3 +129,13 @@ func TestUnmatched(t *testing.T) {
 		t.Errorf("Unmatched = %+v, want p3 (blocked) then p2, no card agent, no unknown", got)
 	}
 }
+
+func TestParseAgentsReadsTheTerminalTitle(t *testing.T) {
+	got := parseAgents(map[string]any{"agents": []any{
+		map[string]any{"pane_id": "w8:pDJ", "cwd": "/x", "agent_status": "idle", "terminal_title_stripped": "my session"},
+		"not an object",
+	}})
+	if len(got) != 1 || got[0].Title != "my session" || got[0].PaneID != "w8:pDJ" || got[0].Status != "idle" {
+		t.Errorf("parseAgents = %+v", got)
+	}
+}
