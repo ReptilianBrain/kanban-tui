@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -91,5 +92,24 @@ func TestMatrixOrphans_NoCostForAnOrphan(t *testing.T) {
 	send(m, "o")
 	if v := m.topModal().(*matrixModal).View(m); !strings.Contains(v, "no "+cardNoun()) {
 		t.Errorf("orphan rows should read %q in the status column", "no "+cardNoun())
+	}
+}
+
+// The live path: a successful poll must hand the orphans to the Model, and a
+// failed or disabled one must not leave stale rows behind.
+func TestMatrixOrphans_PollFeedsTheModel(t *testing.T) {
+	m := newTestModel(t)
+	orphan := herdrsync.AgentInfo{PaneID: "w2:p9", CWD: "/work/scratch", Status: "idle"}
+	m.Update(agentsMsg{orphans: []herdrsync.AgentInfo{orphan}})
+	if len(m.orphans) != 1 || m.orphans[0].PaneID != "w2:p9" {
+		t.Fatalf("orphans after a poll = %v, want the polled agent", m.orphans)
+	}
+	m.Update(agentsMsg{err: errors.New("herdr hiccup")})
+	if len(m.orphans) != 1 {
+		t.Errorf("a failed poll should keep the previous orphans, got %v", m.orphans)
+	}
+	m.Update(agentsMsg{disabled: true})
+	if len(m.orphans) != 0 {
+		t.Errorf("a disabled herdr should clear the orphans, got %v", m.orphans)
 	}
 }
