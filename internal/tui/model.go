@@ -79,6 +79,9 @@ type Model struct {
 	// agentPanes maps card id to the herdr pane of the agent behind its
 	// status; focusAgent is a seam so tests never shell out.
 	agentPanes map[int64]string
+	// orphans are the agents in no card worktree; only the Matrix's "o" view
+	// reads them.
+	orphans    []herdrsync.AgentInfo
 	focusAgent func(target string) error
 
 	// watch moves cards between In Progress and Blocked from agent state;
@@ -309,7 +312,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case agentsMsg:
 		if msg.disabled {
-			m.agents, m.agentPanes = nil, nil
+			m.agents, m.agentPanes, m.orphans = nil, nil, nil
 			return m, nil
 		}
 		var moved tea.Cmd

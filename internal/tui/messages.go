@@ -28,6 +28,7 @@ const agentPollEvery = 3 * time.Second
 type agentsMsg struct {
 	states   map[int64]string
 	panes    map[int64]string
+	orphans  []herdrsync.AgentInfo
 	err      error
 	disabled bool
 }
@@ -45,7 +46,11 @@ func pollAgentsCmd(after time.Duration) tea.Cmd {
 		if err != nil {
 			return agentsMsg{err: err}
 		}
-		return agentsMsg{states: herdrsync.CardStates(agents), panes: herdrsync.CardPanes(agents)}
+		return agentsMsg{
+			states:  herdrsync.CardStates(agents),
+			panes:   herdrsync.CardPanes(agents),
+			orphans: herdrsync.Unmatched(agents),
+		}
 	}
 }
 

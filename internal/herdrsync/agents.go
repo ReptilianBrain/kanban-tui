@@ -3,6 +3,7 @@ package herdrsync
 import (
 	"context"
 	"regexp"
+	"sort"
 	"strconv"
 	"time"
 )
@@ -15,6 +16,9 @@ type AgentInfo struct {
 	PaneID string
 	CWD    string
 	Status string
+	// Title is the pane's terminal title (the Claude session name), used to
+	// label an agent that belongs to no card.
+	Title string
 }
 
 // ListAgents returns every agent herdr knows about. A missing herdr binary
@@ -95,6 +99,26 @@ func mostUrgent(agents []AgentInfo) map[int64]AgentInfo {
 		}
 	}
 	return best
+}
+
+// Unmatched returns the agents that sit in no card worktree (sessions started
+// before a card existed), most urgent first. Agents with an unknown status are
+// left out, as in CardStates.
+func Unmatched(agents []AgentInfo) []AgentInfo {
+	var out []AgentInfo
+	for _, a := range agents {
+		if _, ok := CardID(a.CWD); ok || statusRank[a.Status] == 0 {
+			continue
+		}
+		out = append(out, a)
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if ri, rj := statusRank[out[i].Status], statusRank[out[j].Status]; ri != rj {
+			return ri > rj
+		}
+		return out[i].PaneID < out[j].PaneID
+	})
+	return out
 }
 
 // FocusAgent brings an agent's pane to the front in herdr. target is a pane
