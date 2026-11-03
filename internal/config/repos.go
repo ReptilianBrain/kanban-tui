@@ -16,6 +16,10 @@ type RepoEntry struct {
 	Name string `json:"name"`
 	Path string `json:"path"`
 	Base string `json:"base,omitempty"`
+	// FactoryAllow lists extra claude permission rules (e.g. "Bash(make check)")
+	// that an unattended `kanban factory run` session may use without asking:
+	// the repo's own gate commands.
+	FactoryAllow []string `json:"factory_allow,omitempty"`
 }
 
 // ReposPath returns ~/.kanbantui/repos.json, next to the board database.

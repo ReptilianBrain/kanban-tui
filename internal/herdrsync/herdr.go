@@ -247,6 +247,33 @@ func SeedPrompt(cardID int64, title, description, label, branch string) string {
 // (`--base`); empty leaves herdr's default. It has no effect on a reused
 // agent or a reopened worktree, which already have their branch.
 func OpenCard(repoPath, base, branch, agentName, label, prompt string) (*OpenResult, error) {
+	return OpenCardWith(repoPath, base, branch, agentName, label, prompt,
+		OpenOptions{PermissionMode: "plan", Focus: true})
+}
+
+// OpenOptions tunes how OpenCardWith starts the session. The interactive
+// board path (OpenCard) wants a plan-mode session that takes focus; an
+// unattended factory run wants edits accepted and the pane left in the
+// background.
+type OpenOptions struct {
+	// PermissionMode is passed to claude as --permission-mode; empty means "plan".
+	PermissionMode string
+	// Focus brings the new workspace (or a reused agent) to the front.
+	Focus bool
+	// SettingsFile, when set, is passed to claude as --settings (a path, so
+	// no JSON has to survive the pane's shell).
+	SettingsFile string
+}
+
+// OpenCardWith is OpenCard with explicit session options.
+func OpenCardWith(repoPath, base, branch, agentName, label, prompt string, opts OpenOptions) (*OpenResult, error) {
+	if opts.PermissionMode == "" {
+		opts.PermissionMode = "plan"
+	}
+	focusFlag := "--no-focus"
+	if opts.Focus {
+		focusFlag = "--focus"
+	}
 	checkCtx, checkCancel := context.WithTimeout(context.Background(), worktreeTimeout)
 	pane, err := existingAgentPane(checkCtx, agentName)
 	checkCancel()
@@ -254,8 +281,10 @@ func OpenCard(repoPath, base, branch, agentName, label, prompt string) (*OpenRes
 		return nil, err
 	}
 	if pane != "" {
-		if err := FocusAgent(agentName); err != nil {
-			return nil, err
+		if opts.Focus {
+			if err := FocusAgent(agentName); err != nil {
+				return nil, err
+			}
 		}
 		return &OpenResult{Branch: branch, PaneID: pane, AgentName: agentName, Reused: true}, nil
 	}
@@ -265,7 +294,7 @@ func OpenCard(repoPath, base, branch, agentName, label, prompt string) (*OpenRes
 	if base != "" {
 		createArgs = append(createArgs, "--base", base)
 	}
-	createArgs = append(createArgs, "--label", label, "--focus")
+	createArgs = append(createArgs, "--label", label, focusFlag)
 	wtResult, err := run(wtCtx, "creating worktree", createArgs...)
 	wtCancel()
 	if err != nil {
@@ -274,7 +303,7 @@ func OpenCard(repoPath, base, branch, agentName, label, prompt string) (*OpenRes
 		}
 		openCtx, openCancel := context.WithTimeout(context.Background(), worktreeTimeout)
 		wtResult, err = run(openCtx, "opening existing worktree", "worktree", "open",
-			"--cwd", repoPath, "--branch", branch, "--focus")
+			"--cwd", repoPath, "--branch", branch, focusFlag)
 		openCancel()
 		if err != nil {
 			return nil, err
@@ -287,8 +316,13 @@ func OpenCard(repoPath, base, branch, agentName, label, prompt string) (*OpenRes
 
 	startCtx, startCancel := context.WithTimeout(context.Background(), agentTimeout)
 	defer startCancel()
-	if _, err := run(startCtx, "starting Claude", "agent", "start", agentName,
-		"--kind", "claude", "--pane", wtPane, "--", "--permission-mode", "plan", "--name", label); err != nil {
+	startArgs := []string{"agent", "start", agentName, "--kind", "claude", "--pane", wtPane,
+		"--", "--permission-mode", opts.PermissionMode}
+	if opts.SettingsFile != "" {
+		startArgs = append(startArgs, "--settings", opts.SettingsFile)
+	}
+	startArgs = append(startArgs, "--name", label)
+	if _, err := run(startCtx, "starting Claude", startArgs...); err != nil {
 		return nil, err
 	}
 
