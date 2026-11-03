@@ -76,6 +76,8 @@ func TestBrief(t *testing.T) {
 		"kanban update 7 --append",
 		"kanban move 7 in_review",
 		"Do not commit",
+		"Never chain cd with a write",
+		"absolute paths",
 	} {
 		if !strings.Contains(b, want) {
 			t.Errorf("brief missing %q:\n%s", want, b)

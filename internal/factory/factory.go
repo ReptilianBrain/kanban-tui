@@ -100,6 +100,7 @@ Rules for this run:
 - Do not commit, push, open or merge MRs, or invoke the ship skill. Leave every change uncommitted in the working tree: a human reviews the diff and ships it.
 - Never move the card to completed or blocked and never delete it. Your last card update is moving it to in_review.
 - Development targets only. Production is read-only (REST/CLI APIs, no writes, no SSH).
+- Nobody is watching this session, so avoid anything that needs approval. Never chain cd with a write in one shell command (for example "cd dir && sed ... > file"): the harness stops for manual approval and the run stalls. Use absolute paths, create files with the Write tool, and run each command from your current directory.
 - If the card is ambiguous, needs a human decision, or needs access you do not have, stop. Append a handoff stating exactly what is missing, leave the card in ongoing, and end your turn. Do not guess.
 
 Steps:
