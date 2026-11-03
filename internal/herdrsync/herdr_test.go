@@ -242,3 +242,39 @@ func TestSeedPromptTriage(t *testing.T) {
 		t.Errorf("only the incident label should trigger the brief: %q", other)
 	}
 }
+
+func TestOpenCardWith_FactoryOptions(t *testing.T) {
+	calls := scriptedRun(t,
+		agentNotFound(),        // agent get
+		worktreeCreateOK("p1"), // worktree create
+		okResult(),             // agent start
+		okResult(),             // agent prompt
+	)
+
+	_, err := OpenCardWith("/repo", "origin/development", "card-1-foo", "card-1", "#1 Foo", "prompt",
+		OpenOptions{PermissionMode: "acceptEdits", SettingsFile: "/s/card-1.settings.json"})
+	if err != nil {
+		t.Fatalf("OpenCardWith() error = %v", err)
+	}
+	create := strings.Join((*calls)[1].args, " ")
+	if !strings.Contains(create, "--no-focus") || strings.Contains(create, " --focus") {
+		t.Errorf("worktree create args = %q, want --no-focus", create)
+	}
+	start := strings.Join((*calls)[2].args, " ")
+	if !strings.Contains(start, "--permission-mode acceptEdits --settings /s/card-1.settings.json --name #1 Foo") {
+		t.Errorf("agent start args = %q, want acceptEdits, the settings file, then --name", start)
+	}
+}
+
+func TestOpenCardWith_ReusedAgentIsNotFocusedInBackground(t *testing.T) {
+	// Only the agent-get call is scripted: a focus call would trip the
+	// "unexpected extra herdr call" guard.
+	calls := scriptedRun(t, agentGetOK("p9"))
+	res, err := OpenCardWith("/repo", "", "card-1-foo", "card-1", "#1 Foo", "prompt", OpenOptions{})
+	if err != nil || !res.Reused {
+		t.Fatalf("OpenCardWith() = %+v, %v; want a reused agent", res, err)
+	}
+	if len(*calls) != 1 {
+		t.Errorf("got %d herdr calls, want only the agent get", len(*calls))
+	}
+}

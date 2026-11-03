@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -12,6 +13,7 @@ func newUpdateCmd(ctx *appCtx) *cobra.Command {
 	var (
 		title       string
 		description string
+		appendText  string
 		status      string
 		priority    string
 		due         string
@@ -41,9 +43,15 @@ func newUpdateCmd(ctx *appCtx) *cobra.Command {
 			if cmd.Flags().Changed("title") {
 				newTitle = title
 			}
+			if cmd.Flags().Changed("description") && cmd.Flags().Changed("append") {
+				return fail(cmd, "--description and --append are mutually exclusive")
+			}
 			newDesc := card.Description
 			if cmd.Flags().Changed("description") {
 				newDesc = description
+			}
+			if cmd.Flags().Changed("append") {
+				newDesc = appendDescription(card.Description, appendText)
 			}
 			newPriority := card.Priority
 			if cmd.Flags().Changed("priority") {
@@ -113,6 +121,7 @@ func newUpdateCmd(ctx *appCtx) *cobra.Command {
 
 	cmd.Flags().StringVarP(&title, "title", "t", "", "New title.")
 	cmd.Flags().StringVarP(&description, "description", "m", "", "New description.")
+	cmd.Flags().StringVar(&appendText, "append", "", "Append text to the description after a blank line (keeps the existing text; for handoff notes).")
 	cmd.Flags().VarP(&choiceValue{value: &status, allowed: allStatuses}, "status", "s", "Move to a different column.")
 	cmd.Flags().VarP(&choiceValue{value: &priority, allowed: priorities}, "priority", "p", "")
 	cmd.Flags().StringVar(&due, "due", "", `Due date: YYYY-MM-DD, +Nd, +Nbd (weekends skipped), or "" to clear.`)
@@ -121,4 +130,17 @@ func newUpdateCmd(ctx *appCtx) *cobra.Command {
 	cmd.Flags().BoolVar(&asJSON, "json", false, "Print the resulting card as JSON.")
 
 	return cmd
+}
+
+// appendDescription adds text to a description after a blank line, so a
+// handoff never overwrites the card's spec. Appending nothing is a no-op.
+func appendDescription(current, text string) string {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return current
+	}
+	if strings.TrimSpace(current) == "" {
+		return text
+	}
+	return strings.TrimRight(current, "\n") + "\n\n" + text
 }
