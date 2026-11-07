@@ -38,6 +38,10 @@ func (m *Model) cardStatus(id int64) (string, bool) {
 	return "", false
 }
 
+// blockingModal reports whether an open modal should freeze the live refresh
+// and the watcher.
+func (m *Model) blockingModal() bool { return len(m.modalStack) > 0 }
+
 // reconcileAgents applies one poll of agent states and returns a toast Cmd
 // when a card's agent has waited past waitAfter. While a modal is open it does
 // nothing, like the DB poll, so a toast never lands on an edit in progress;
