@@ -27,8 +27,6 @@ const agentPollEvery = 3 * time.Second
 // other error keeps the previous states and tries again next round.
 type agentsMsg struct {
 	states   map[int64]string
-	panes    map[int64]string
-	orphans  []herdrsync.AgentInfo
 	err      error
 	disabled bool
 }
@@ -47,9 +45,7 @@ func pollAgentsCmd(after time.Duration) tea.Cmd {
 			return agentsMsg{err: err}
 		}
 		return agentsMsg{
-			states:  herdrsync.CardStates(agents),
-			panes:   herdrsync.CardPanes(agents),
-			orphans: herdrsync.Unmatched(agents),
+			states: herdrsync.CardStates(agents),
 		}
 	}
 }
@@ -64,7 +60,3 @@ func toastClearCmd(seq int) tea.Cmd {
 		return toastClearMsg{seq: seq}
 	})
 }
-
-// matrixFocusDoneMsg is the result of jumping to a card's agent pane from the
-// Matrix.
-type matrixFocusDoneMsg struct{ err error }

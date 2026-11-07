@@ -40,8 +40,6 @@ func (m *Model) handleBoardKey(msg tea.KeyMsg) tea.Cmd {
 		return m.actionMoveCardDown()
 	case "f":
 		return m.actionFilter()
-	case "m":
-		return m.actionMatrix()
 	case "/":
 		return m.actionSearch()
 	case "esc":
@@ -387,7 +385,7 @@ func (m *Model) handleHerdrOpenDone(msg herdrOpenDoneMsg) tea.Cmd {
 		text = fmt.Sprintf("Reconnected to %s in herdr%s", msg.result.Branch, warn)
 	}
 	// Herdr already focused the new workspace; a popup would keep holding
-	// input over it until the app exits, as after a Matrix jump.
+	// input over it until the app exits.
 	if m.popup {
 		m.quitting = true
 		return tea.Quit

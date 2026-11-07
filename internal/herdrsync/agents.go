@@ -3,7 +3,6 @@ package herdrsync
 import (
 	"context"
 	"regexp"
-	"sort"
 	"strconv"
 	"time"
 )
@@ -83,16 +82,6 @@ func CardStates(agents []AgentInfo) map[int64]string {
 	return states
 }
 
-// CardPanes maps card id to the pane of the agent CardStates reports for it,
-// so a jump lands on the pane the card's badge describes.
-func CardPanes(agents []AgentInfo) map[int64]string {
-	panes := map[int64]string{}
-	for id, a := range mostUrgent(agents) {
-		panes[id] = a.PaneID
-	}
-	return panes
-}
-
 func mostUrgent(agents []AgentInfo) map[int64]AgentInfo {
 	best := map[int64]AgentInfo{}
 	for _, a := range agents {
@@ -105,26 +94,6 @@ func mostUrgent(agents []AgentInfo) map[int64]AgentInfo {
 		}
 	}
 	return best
-}
-
-// Unmatched returns the agents that sit in no card worktree (sessions started
-// before a card existed), most urgent first. Agents with an unknown status are
-// left out, as in CardStates.
-func Unmatched(agents []AgentInfo) []AgentInfo {
-	var out []AgentInfo
-	for _, a := range agents {
-		if _, ok := CardID(a.CWD); ok || statusRank[a.Status] == 0 {
-			continue
-		}
-		out = append(out, a)
-	}
-	sort.SliceStable(out, func(i, j int) bool {
-		if ri, rj := statusRank[out[i].Status], statusRank[out[j].Status]; ri != rj {
-			return ri > rj
-		}
-		return out[i].PaneID < out[j].PaneID
-	})
-	return out
 }
 
 // FocusAgent brings an agent's pane to the front in herdr. target is a pane

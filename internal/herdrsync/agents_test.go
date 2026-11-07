@@ -90,20 +90,6 @@ func TestCardStates_PrefersMostUrgent(t *testing.T) {
 	}
 }
 
-func TestCardPanes_FollowsTheMostUrgentAgent(t *testing.T) {
-	got := CardPanes([]AgentInfo{
-		{PaneID: "w1:p1", CWD: "/wt/card-1-a", Status: "idle"},
-		{PaneID: "w1:p2", CWD: "/wt/card-1-a/sub", Status: "blocked"},
-		{PaneID: "w2:p1", CWD: "/wt/card-2-b", Status: "done"},
-		{PaneID: "w3:p1", CWD: "/elsewhere", Status: "working"},
-		{PaneID: "w4:p1", CWD: "/wt/card-3-c", Status: "unknown"},
-	})
-	want := map[int64]string{1: "w1:p2", 2: "w2:p1"}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("CardPanes = %v, want %v", got, want)
-	}
-}
-
 func TestFocusAgent(t *testing.T) {
 	calls := scriptedRun(t, okResult())
 	if err := FocusAgent("w1:p2"); err != nil {
@@ -115,18 +101,6 @@ func TestFocusAgent(t *testing.T) {
 	scriptedRun(t, herdrResult{ExitCode: 1, Stdout: []byte(`{"error":{"code":"agent_not_found","message":"agent target w1:p9 not found"}}`)})
 	if err := FocusAgent("w1:p9"); err == nil {
 		t.Error("a herdr failure should surface as an error")
-	}
-}
-
-func TestUnmatched(t *testing.T) {
-	got := Unmatched([]AgentInfo{
-		{PaneID: "p1", CWD: "/home/me/.herdr/worktrees/r/card-12-x", Status: "working"},
-		{PaneID: "p2", CWD: "/home/me/scratch", Status: "idle"},
-		{PaneID: "p3", CWD: "/home/me/other", Status: "blocked"},
-		{PaneID: "p4", CWD: "/home/me/odd", Status: "unknown"},
-	})
-	if len(got) != 2 || got[0].PaneID != "p3" || got[1].PaneID != "p2" {
-		t.Errorf("Unmatched = %+v, want p3 (blocked) then p2, no card agent, no unknown", got)
 	}
 }
 

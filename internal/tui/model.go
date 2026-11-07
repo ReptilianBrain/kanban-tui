@@ -13,7 +13,6 @@ import (
 
 	"github.com/ReptilianBrain/kanban-tui/internal/cost"
 	"github.com/ReptilianBrain/kanban-tui/internal/db"
-	"github.com/ReptilianBrain/kanban-tui/internal/herdrsync"
 )
 
 // cycleText renders a card's total spend (its Cycle), or "" with no data.
@@ -76,14 +75,6 @@ type Model struct {
 	// until the first poll answers or when herdr is not installed.
 	agents map[int64]string
 
-	// agentPanes maps card id to the herdr pane of the agent behind its
-	// status; focusAgent is a seam so tests never shell out.
-	agentPanes map[int64]string
-	// orphans are the agents in no card worktree; only the Matrix's "o" view
-	// reads them.
-	orphans    []herdrsync.AgentInfo
-	focusAgent func(target string) error
-
 	// watch moves cards between In Progress and Blocked from agent state;
 	// clock is a seam so tests can fast-forward the waiting window.
 	watch *watcher
@@ -97,10 +88,6 @@ type Model struct {
 	// exits, so closing it is the app's job: Esc at the board, q, and F15
 	// (the key that opened it) all quit.
 	popup bool
-
-	// matrixHome is set by KANBANTUI_START=matrix: the board opens straight
-	// into the Matrix, and closing it quits instead of revealing the board.
-	matrixHome bool
 
 	quitting bool
 }
@@ -118,11 +105,9 @@ func newModel(store *db.DB) *Model {
 		searchInput: ti,
 		data:        map[string][]db.Card{},
 		watch:       newWatcher(),
-		focusAgent:  herdrsync.FocusAgent,
 		clock:       time.Now,
 		costDir:     cost.Dir(),
 		popup:       os.Getenv("KANBANTUI_POPUP") != "",
-		matrixHome:  os.Getenv("KANBANTUI_START") == "matrix",
 	}
 }
 
@@ -137,10 +122,6 @@ func Run() error {
 	m := newModel(store)
 	if err := m.loadData(); err != nil {
 		return fmt.Errorf("tui: loading board: %w", err)
-	}
-
-	if m.matrixHome {
-		m.actionMatrix()
 	}
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
@@ -292,38 +273,23 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case matrixFocusDoneMsg:
-		if msg.err != nil {
-			return m, m.toast(toastError, msg.err.Error())
-		}
-		if len(m.modalStack) > 0 {
-			if _, ok := m.topModal().(*matrixModal); ok {
-				m.popModal()
-			}
-		}
-		if m.popup {
-			m.quitting = true
-			return m, tea.Quit
-		}
-		return m, nil
-
 	case herdrOpenDoneMsg:
 		return m, m.handleHerdrOpenDone(msg)
 
 	case agentsMsg:
 		if msg.disabled {
-			m.agents, m.agentPanes, m.orphans = nil, nil, nil
+			m.agents = nil
 			return m, nil
 		}
 		var moved tea.Cmd
 		if msg.err == nil {
-			m.agents, m.agentPanes, m.orphans = msg.states, msg.panes, msg.orphans
+			m.agents = msg.states
 			moved = m.reconcileAgents(msg.states)
 		}
 		return m, tea.Batch(moved, pollAgentsCmd(agentPollEvery))
 
 	case tea.KeyMsg:
-		if k := msg.String(); k == "ctrl+c" || (m.popup && (k == "f15" || (m.matrixHome && k == "f20"))) {
+		if k := msg.String(); k == "ctrl+c" || (m.popup && k == "f15") {
 			m.quitting = true
 			return m, tea.Quit
 		}

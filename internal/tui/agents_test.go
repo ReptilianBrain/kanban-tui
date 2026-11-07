@@ -108,9 +108,12 @@ func TestPopup_EscQAndF15Close(t *testing.T) {
 	// F15 closes from inside a modal too
 	m = newTestModel(t)
 	m.popup = true
-	send(m, "m")
+	send(m, "t")
+	if m.topModal() == nil {
+		t.Fatal("t should open a modal")
+	}
 	if !quits(m, "f15") {
-		t.Error("popup: f15 should quit from inside the Matrix")
+		t.Error("popup: f15 should quit from inside a modal")
 	}
 
 	// outside a popup: esc and f15 do nothing, q still quits
@@ -156,29 +159,5 @@ func TestPopup_HerdrOpenQuitsOnlyOnSuccess(t *testing.T) {
 	m.Update(ok)
 	if m.quitting {
 		t.Error("not a popup: a successful herdr open must not quit")
-	}
-}
-
-func TestMatrixHome_CloseAndF20Quit(t *testing.T) {
-	m := newTestModel(t)
-	m.matrixHome = true
-	m.actionMatrix()
-	_, cmd := m.Update(key("esc"))
-	if !m.quitting || cmd == nil {
-		t.Error("matrix home: closing the Matrix should quit")
-	}
-
-	m = newTestModel(t)
-	m.popup, m.matrixHome = true, true
-	m.actionMatrix()
-	if _, cmd := m.Update(key("f20")); !m.quitting || cmd == nil {
-		t.Error("matrix home popup: f20 should quit")
-	}
-
-	m = newTestModel(t)
-	m.actionMatrix()
-	m.Update(key("esc"))
-	if m.quitting {
-		t.Error("regular board: closing the Matrix must return to the board")
 	}
 }
