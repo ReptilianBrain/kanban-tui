@@ -115,7 +115,6 @@ func newRootCmd() *cobra.Command {
 		newNoteCmd(ctx),
 		newNotesCmd(ctx),
 		newNoteDeleteCmd(ctx),
-		newFactoryCmd(ctx),
 	)
 	return root
 }
